@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.6.12;
 
-interface Uni {
+interface IFrax {
 
     function earned(address account)
         external
@@ -29,6 +29,8 @@ interface Uni {
         external;
 
     function withdrawLocked(uint256 token_id) external;
+
+    function getReward() external;
 
     function swapExactETHForTokens(
         uint256 amountOutMin,

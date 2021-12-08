@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.6.12;
 
-interface Uni {
+interface IUniNFT {
     function swapExactETHForTokens(
         uint256 amountOutMin,
         address[] calldata path,
@@ -22,7 +22,7 @@ interface Uni {
         view
         returns (uint256[] memory amounts);
 
-    function mint((
+    function mint(
         address token0,
         address token1,
         uint24 fee,
@@ -34,7 +34,6 @@ interface Uni {
         uint256 amount1Min,
         address recipient,
         uint256 deadline)
-        )
         external;
 
     function positions(uint256 tokenId)external view returns (
@@ -70,7 +69,7 @@ interface Uni {
     function increaseLiquidity(
         uint256 token_id,
         uint256 amountAdd0,
-        uint256 amountAdd1,
+        uint256 amountAdd1
         ) external returns (
             uint128 liquidity,
             uint256 amount0,

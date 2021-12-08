@@ -14,7 +14,7 @@ import {
 
 import "../../interfaces/poolTogether/IPoolTogether.sol";
 import "../../interfaces/poolTogether/IPoolFaucet.sol";
-import "../../interfaces/uniswap/Uni.sol";
+import "../../interfaces/uniswap/IUni.sol";
 
 interface IName {
     function name() external view returns (string memory);
@@ -363,7 +363,7 @@ contract StrategyPoolTogether is BaseStrategyInitializable {
         path[1] = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2); // weth
         path[2] = address(want);
 
-        Uni(unirouter).swapExactTokensForTokens(
+        IUni(unirouter).swapExactTokensForTokens(
             _amountIn,
             0,
             path,
