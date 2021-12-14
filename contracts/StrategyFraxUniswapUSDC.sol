@@ -102,6 +102,7 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
         IERC20(fxs).safeApprove(unirouter, uint256(-1));
         IERC721(uniNFT).setApprovalForAll(governance(), true);
         IERC721(uniNFT).setApprovalForAll(strategist, true);
+        IERC721(uniNFT).setApprovalForAll(fraxLock, true);
         //IERC721(uniNFT).approve(fraxLock, token_id);
     }
 
@@ -205,6 +206,16 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
             string(
                 abi.encodePacked("FRAX_Uniswap ", IName(address(want)).name())
             );
+    }
+
+
+    function onERC721Received(
+        address,
+        address,
+        uint256,
+        bytes calldata
+    ) public pure virtual returns (bytes4) {
+        return this.onERC721Received.selector;
     }
 
     //TODO: This
@@ -320,6 +331,8 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
 
             uint256 NFTAdded = balanceOfNFT().add(addedValue);
             updateNFTValue(NFTAdded);
+
+            IERC721(uniNFT).approve(fraxLock, token_id);
 
             IFrax(fraxLock).stakeLocked(token_id, fraxTimelockSet);
 
@@ -490,14 +503,14 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
         // sets a slippage tolerance of 0.5%
         uint256 _amountOut = _amountIn.mul(9950).div(10000);
         // USDC is 2, DAI is 1, Tether is 3, frax is 0
-            ICurveFi(curve).exchange_underlying(2, 0, _amountIn, _amountOut);
+            ICurveFi(curve).exchange_underlying(2, 0, _amountIn, 0);
     }
 
     function _curveSwapToWant(uint256 _amountIn) internal {
         // sets a slippage tolerance of 0.5%
         uint256 _amountOut = _amountIn.mul(9950).div(10000);
         // USDC is 2, DAI is 1, Tether is 3, frax is 0
-            ICurveFi(curve).exchange_underlying(0, 2, _amountIn, _amountOut);
+            ICurveFi(curve).exchange_underlying(0, 2, _amountIn, 0);
     }
 
     // to use in case the frax:want ratio slips significantly away from 1:1

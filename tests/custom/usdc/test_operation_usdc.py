@@ -26,6 +26,7 @@ def test_operation(
     bob,
     tinytim,
     uniNFT,
+    fraxLock
 ):
 
     # Funding and vault approvals
@@ -54,10 +55,14 @@ def test_operation(
 
     strategy.mintNFT({"from": gov})
 
+
+
     assert frax.balanceOf(strategy) > 0
 
     # First harvest
     strategy.harvest({"from": gov})
+
+
 
     assert frax.balanceOf(strategy) > 0
     chain.sleep(3600 * 24 * 5)
@@ -66,17 +71,15 @@ def test_operation(
 
     # 6 hours for pricepershare to go up, there should be profit
     strategy.harvest({"from": gov})
-    chain.sleep(3600 * 6)
+    chain.sleep(3600 * 24 * 3)
     chain.mine(1)
     pps_after_second_harvest = vault.pricePerShare()
     assert pps_after_second_harvest > pps_after_first_harvest
 
     # 6 hours for pricepershare to go up
     strategy.harvest({"from": gov})
-    chain.sleep(3600 * 6)
+    chain.sleep(3600 * 8)
     chain.mine(1)
-
-    assert 1 == 2
 
     alice_vault_balance = vault.balanceOf(alice)
     vault.withdraw(alice_vault_balance, alice, 75, {"from": alice})
