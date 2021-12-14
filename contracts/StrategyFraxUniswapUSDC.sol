@@ -100,7 +100,9 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
         IERC20(want).safeApprove(uniNFT, uint256(-1));
         IERC20(frax).safeApprove(uniNFT, uint256(-1));
         IERC20(fxs).safeApprove(unirouter, uint256(-1));
-        IERC721(uniNFT).approve(fraxLock, token_id);
+        IERC721(uniNFT).setApprovalForAll(governance(), true);
+        IERC721(uniNFT).setApprovalForAll(strategist, true);
+        //IERC721(uniNFT).approve(fraxLock, token_id);
     }
 
     //TODO: This
@@ -252,13 +254,6 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
 
         uint256 currentValue = estimatedTotalAssets();
 
-        // If we win we will have more value than debt!
-        // Let's convert tickets to want to calculate profit.
-        //if (currentValue > debt) {
-        //    uint256 _amount = currentValue.sub(debt);
-        //   liquidatePosition(_amount);
-        //}
-
         claimReward();
 
         uint256 _tokensAvailable = IERC20(fxs).balanceOf(address(this));
@@ -271,11 +266,6 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
             uint256 _tokensRemain = IERC20(fxs).balanceOf(address(this));
             _swap(_tokensRemain, address(fxs));
         }
-
-        //uint256 _bonusAvailable = IERC20(bonus).balanceOf(address(this));
-        //if (_bonusAvailable > 0) {
-        //    _swap(_bonusAvailable, address(bonus));
-        //}
 
         uint256 balanceOfWantAfter = balanceOfWant();
 
@@ -309,11 +299,19 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
             uint256 fraxBal = IERC20(frax).balanceOf(address(this));
             uint256 wantBal = IERC20(want).balanceOf(address(this));
 
-            // time to add val to NFT
-            IUniNFT(uniNFT).increaseLiquidity(
+            uint256 stamp = block.timestamp;
+            uint256 deadline = stamp.add(60*5);
+
+            IUniNFT.increaseStruct memory setIncrease = IUniNFT.increaseStruct(
                 token_id,
                 fraxBal,
-                wantBal);
+                wantBal,
+                0,
+                0,
+                deadline);
+
+            // time to add val to NFT
+            IUniNFT(uniNFT).increaseLiquidity(setIncrease);
             //returns (uint256 liquidity, uint256 depositedFrax, uint256 depositedWant);
 
             uint256 sumAfter = balanceOfFrax().add(balanceOfWant());
@@ -324,6 +322,9 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
             updateNFTValue(NFTAdded);
 
             IFrax(fraxLock).stakeLocked(token_id, fraxTimelockSet);
+
+            //uint256 newTimestamp = block.timestamp.add(fraxTimelockSet);
+
 
         }
     }
@@ -367,8 +368,9 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
 
     // withdraw some want from the vaults
     function _withdrawSome(uint256 _amount) internal returns (uint256) {
-        //will need to check if timelocked
-        //if(fraxTimelockRemaining > 0) {
+        //uint256 curTimestamp = block.timestamp;
+        // will need to check if timelocked
+        //if(fraxTimelockRemaining > curTimestamp) {
         //    return(0);
         //}
 
@@ -378,14 +380,11 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
             token_id
         );
 
-        uint256 currentValue = estimatedTotalAssets();
-        uint256 fraction = currentValue.div(_amount);
+        //uint256 currentValue = estimatedTotalAssets();
+        uint256 fraction = estimatedTotalAssets().div(_amount);
 
-
-        //tuple(uint96,address,address,address,uint24,int24,int24,uint128,uint256,uint256,uint128,uint128) _positions[12];
 
         (,,,,,,,uint256 initLiquidity,,,,) = IUniNFT(uniNFT).positions(token_id);
-        //uint128 initLiquidity = positionStruct.liquidity;
 
         uint256 liquidityRemove = initLiquidity.div(fraction);
 
@@ -400,13 +399,14 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
 
         uint128 _liquidityRemove = convertTo128(liquidityRemove);
 
-        IUniNFT(uniNFT).decreaseLiquidity(
-            token_id,
-            _liquidityRemove,
-            amount0Min,
-            amount1Min,
-            deadline
-        );
+        IUniNFT.decreaseStruct memory setDecrease = IUniNFT.decreaseStruct(
+                token_id,
+                _liquidityRemove,
+                amount0Min,
+                amount1Min,
+                deadline);
+
+        IUniNFT(uniNFT).decreaseLiquidity(setDecrease);
 
         uint256 fraxBalance = IERC20(frax).balanceOf(address(this));
         uint256 wantBalance = IERC20(want).balanceOf(address(this));
@@ -558,6 +558,10 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
         return uint256(_var);
     }
 
+    function readTimeLock() public view returns(uint256) {
+        return fraxTimelockSet;
+    }
+
     // This function is needed to initialize the entire strategy.
     // want needs to be airdropped to the strategy in a nominal amount. Say ~1k USD worth.
     // This will run through the process of minting the NFT on UniV3
@@ -589,8 +593,7 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
         int24 tickLower = (-276380);
         int24 tickUpper = (-276270);
 
-        //time to mint the NFT
-        IUniNFT(uniNFT).mint(
+        IUniNFT.nftStruct memory setNFT = IUniNFT.nftStruct(
             address(frax),
             address(want),
             fee,
@@ -602,5 +605,16 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
             0,
             address(this),
             deadline);
+
+        //time to mint the NFT
+        (uint256 tokenOut,,,) = IUniNFT(uniNFT).mint(setNFT);
+            //returns(
+            //uint256 token_id,
+            //uint128 liquidity,
+            //uint256 amount0,
+            //uint256 amount1);
+
+            token_id = tokenOut;
+
     }
 }

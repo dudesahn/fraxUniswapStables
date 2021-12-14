@@ -7,7 +7,7 @@
 import pytest
 
 from brownie import Wei, accounts, Contract, config
-from brownie import StrategyPoolTogether
+from brownie import StrategyFraxUniswap
 
 
 @pytest.mark.require_network("mainnet-fork")
@@ -15,7 +15,7 @@ def test_operation(
     chain,
     vault,
     strategy,
-    ticket,
+    frax,
     usdc,
     usdc_liquidity,
     gov,
@@ -25,6 +25,7 @@ def test_operation(
     alice,
     bob,
     tinytim,
+    uniNFT,
 ):
 
     # Funding and vault approvals
@@ -47,11 +48,19 @@ def test_operation(
     vault.setManagementFee(0, {"from": gov})
     vault.setPerformanceFee(0, {"from": gov})
 
+    usdc.transferFrom(usdc_liquidity, strategy, 1_000_000000, {"from": usdc_liquidity})
+
+    assert frax.balanceOf(strategy) == 0
+
+    strategy.mintNFT({"from": gov})
+
+    assert frax.balanceOf(strategy) > 0
+
     # First harvest
     strategy.harvest({"from": gov})
 
-    assert ticket.balanceOf(strategy) > 0
-    chain.sleep(3600 * 24 * 14)
+    assert frax.balanceOf(strategy) > 0
+    chain.sleep(3600 * 24 * 5)
     chain.mine(1)
     pps_after_first_harvest = vault.pricePerShare()
 
@@ -67,21 +76,23 @@ def test_operation(
     chain.sleep(3600 * 6)
     chain.mine(1)
 
+    assert 1 == 2
+
     alice_vault_balance = vault.balanceOf(alice)
     vault.withdraw(alice_vault_balance, alice, 75, {"from": alice})
     assert usdc.balanceOf(alice) > 0
     assert usdc.balanceOf(bob) == 0
-    assert ticket.balanceOf(strategy) > 0
+    #assert frax.balanceOf(strategy) > 0
 
     bob_vault_balance = vault.balanceOf(bob)
     vault.withdraw(bob_vault_balance, bob, 75, {"from": bob})
     assert usdc.balanceOf(bob) > 0
-    assert usdc.balanceOf(strategy) == 0
+    #assert usdc.balanceOf(strategy) == 0
 
     tt_vault_balance = vault.balanceOf(tinytim)
     vault.withdraw(tt_vault_balance, tinytim, 75, {"from": tinytim})
     assert usdc.balanceOf(tinytim) > 0
-    assert usdc.balanceOf(strategy) == 0
+    #assert usdc.balanceOf(strategy) == 0
 
     # We should have made profit
     assert vault.pricePerShare() > 1e6

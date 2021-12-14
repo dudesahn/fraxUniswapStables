@@ -78,24 +78,24 @@ def strategy(
     guardian,
     keeper,
     vault,
-    StrategyPoolTogether,
+    StrategyFraxUniswap,
     gov,
-    want_pool,
-    pool_token,
+    frax,
+    fxs,
     uni,
-    bonus,
-    faucet,
-    ticket,
+    uniNFT,
+    fraxLock,
+    curve,
 ):
     strategy = guardian.deploy(
-        StrategyPoolTogether,
+        StrategyFraxUniswap,
         vault,
-        want_pool,
-        pool_token,
+        frax,
+        fxs,
         uni,
-        bonus,
-        faucet,
-        ticket,
+        uniNFT,
+        fraxLock,
+        curve,
     )
     strategy.setKeeper(keeper)
     vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
@@ -108,28 +108,28 @@ def uni():
 
 
 @pytest.fixture
-def want_pool():
-    yield Contract("0xde9ec95d7708B8319CCca4b8BC92c0a3B70bf416")
+def frax():
+    yield Contract("0x853d955acef822db058eb8505911ed77f175b99e")
 
 
 @pytest.fixture
-def pool_token():
-    yield Contract("0x0cec1a9154ff802e7934fc916ed7ca50bde6844e")
+def fxs():
+    yield Contract("0x3432b6a60d23ca0dfca7761b7ab56459d9c964d0")
 
 
 @pytest.fixture
-def bonus():
-    yield Contract("0xc00e94cb662c3520282e6f5717214004a7f26888")
+def uniNFT():
+    yield Contract("0xC36442b4a4522E871399CD717aBDD847Ab11FE88")
 
 
 @pytest.fixture
-def faucet():
-    yield Contract("0xBD537257fAd96e977b9E545bE583bbF7028F30b9")
+def fraxLock():
+    yield Contract("0x3EF26504dbc8Dd7B7aa3E97Bc9f3813a9FC0B4B0")
 
 
 @pytest.fixture
-def ticket():
-    yield Contract("0xd81b1a8b1ad00baa2d6609e0bae28a38713872f7")
+def curve():
+    yield Contract("0xd632f22692FaC7611d2AA1C0D552930D43CAEd3B")
 
 
 @pytest.fixture
@@ -138,34 +138,38 @@ def newstrategy(
     guardian,
     keeper,
     vault,
-    StrategyPoolTogether,
+    StrategyFraxUniswap,
     gov,
-    want_pool,
-    pool_token,
+    frax,
+    fxs,
     uni,
-    bonus,
-    faucet,
-    ticket,
+    uniNFT,
+    fraxLock,
+    curve,
 ):
     newstrategy = guardian.deploy(
-        StrategyPoolTogether,
-        vault,
-        want_pool,
-        pool_token,
+        StrategyFraxUniswap,
+        gov,
+        frax,
+        fxs,
         uni,
-        bonus,
-        faucet,
-        ticket,
+        uniNFT,
+        fraxLock,
+        curve,
     )
     newstrategy.setKeeper(keeper)
     yield newstrategy
 
 
 @pytest.fixture
-def ticket_liquidity(accounts):
-    yield accounts.at("0x80845058350B8c3Df5c3015d8a717D64B3bF9267", force=True)
+def frax_liquidity(accounts):
+    yield accounts.at("0xd632f22692fac7611d2aa1c0d552930d43caed3b", force=True)
 
 
 @pytest.fixture
-def bonus_liquidity(accounts):
-    yield accounts.at("0x7587cAefc8096f5F40ACB83A09Df031a018C66ec", force=True)
+def fxs_liquidity(accounts):
+    yield accounts.at("0xc8418af6358ffdda74e09ca9cc3fe03ca6adc5b0", force=True)
+
+@pytest.fixture
+def token_owner(accounts):
+    yield accounts.at("0x11E4857Bb9993a50c685A79AFad4E6F65D518DDa", force=True)
