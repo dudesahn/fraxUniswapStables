@@ -99,4 +99,6 @@ interface IUniNFT {
             uint256 amount1
         );
 
+    function ownerOf(uint256 tokenID) external view returns(address);
+
 }

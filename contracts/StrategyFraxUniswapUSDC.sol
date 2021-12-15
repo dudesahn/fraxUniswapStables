@@ -292,6 +292,14 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
             return;
         }
 
+        address nftOwner = IUniNFT(uniNFT).ownerOf(token_id);
+
+        if (nftOwner == address(fraxLock)) {
+            IFrax(fraxLock).withdrawLocked(
+                token_id
+            );
+        }
+
         uint256 _balanceOfWant = balanceOfWant();
 
         // do not invest if we have more debt than want
@@ -394,12 +402,12 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
         );
 
         //uint256 currentValue = estimatedTotalAssets();
-        uint256 fraction = estimatedTotalAssets().div(_amount);
+        uint256 fraction = (_amount).mul(1000).div(estimatedTotalAssets());
 
 
         (,,,,,,,uint256 initLiquidity,,,,) = IUniNFT(uniNFT).positions(token_id);
 
-        uint256 liquidityRemove = initLiquidity.div(fraction);
+        uint256 liquidityRemove = initLiquidity.mul(fraction).div(1000);
 
         uint256 _timestamp = block.timestamp;
         uint256 deadline = _timestamp.add(5*60);
@@ -407,16 +415,16 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
         // should be set at some value for slippage.  Currently at 1 for testing
         //TODO: see above
         // maybe _amount.mul(1e5).div(2e5).mul(9e4).div(1e5)
-        uint256 amount0Min = 1;
-        uint256 amount1Min = 1;
+        //uint256 amount0Min = 0;
+        //uint256 amount1Min = 0;
 
-        uint128 _liquidityRemove = convertTo128(liquidityRemove);
+        uint128 _liquidityRemove = uint128(liquidityRemove);
 
         IUniNFT.decreaseStruct memory setDecrease = IUniNFT.decreaseStruct(
                 token_id,
                 _liquidityRemove,
-                amount0Min,
-                amount1Min,
+                0,
+                0,
                 deadline);
 
         IUniNFT(uniNFT).decreaseLiquidity(setDecrease);
@@ -563,11 +571,11 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
         _balanceOfNFT = _value;
     }
 
-    function convertTo128(uint256 _var) internal returns (uint128) {
+    function convertTo128(uint256 _var) public returns (uint128) {
         return uint128(_var);
     }
 
-    function convertTo256(uint128 _var) internal returns (uint256) {
+    function convertTo256(uint128 _var) public returns (uint256) {
         return uint256(_var);
     }
 

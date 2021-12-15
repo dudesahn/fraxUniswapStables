@@ -49,7 +49,7 @@ def test_operation(
     vault.setManagementFee(0, {"from": gov})
     vault.setPerformanceFee(0, {"from": gov})
 
-    usdc.transferFrom(usdc_liquidity, strategy, 1_000_000000, {"from": usdc_liquidity})
+    usdc.transferFrom(usdc_liquidity, strategy, 100_000000, {"from": usdc_liquidity})
 
     assert frax.balanceOf(strategy) == 0
 
@@ -62,8 +62,6 @@ def test_operation(
     # First harvest
     strategy.harvest({"from": gov})
 
-
-
     assert frax.balanceOf(strategy) > 0
     chain.sleep(3600 * 24 * 5)
     chain.mine(1)
@@ -71,14 +69,14 @@ def test_operation(
 
     # 6 hours for pricepershare to go up, there should be profit
     strategy.harvest({"from": gov})
-    chain.sleep(3600 * 24 * 3)
+    chain.sleep(3600 * 24 * 5)
     chain.mine(1)
     pps_after_second_harvest = vault.pricePerShare()
     assert pps_after_second_harvest > pps_after_first_harvest
 
     # 6 hours for pricepershare to go up
     strategy.harvest({"from": gov})
-    chain.sleep(3600 * 8)
+    chain.sleep(3600 * 24 * 5)
     chain.mine(1)
 
     alice_vault_balance = vault.balanceOf(alice)
