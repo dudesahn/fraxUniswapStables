@@ -13,9 +13,7 @@ import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 //import "@uniswap/v3-periphery/contracts/libraries/PositionValue.sol";
 //import "@uniswap/v3-core/contracts/libraries/SqrtPriceMath.sol";
 //import "@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol";
-import {
-    BaseStrategyInitializable
-} from "../../contracts/BaseStrategyEdited.sol";
+import {BaseStrategyInitializable} from "@yearn/contracts/BaseStrategy.sol";
 
 import "../../interfaces/frax/IFrax.sol";
 import "../../interfaces/uniswap/IUniNFT.sol";
@@ -31,6 +29,8 @@ import "../../libraries/SafeCast.sol";
 import "../../libraries/SqrtPriceMath.sol";
 import "../../libraries/TickMath.sol";
 import "../../libraries/LiquidityAmounts.sol";
+//import "../../CRV3_v2_vault/contracts/BaseStrategy.sol";
+//import "../../CRV3_v2_vault/contracts/BaseStrategy.sol";
 //import "../../libraries/PositionValue.sol";
 
 
@@ -433,12 +433,9 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
 
         address nftOwner = IUniNFT(uniNFT).ownerOf(token_id);
         if (nftOwner == address(fraxLock)) {
-            IFrax(fraxLock).withdrawLocked(
-                token_id
-            );
+            IFrax(fraxLock).withdrawLocked(token_id);
         }
 
-        //uint256 currentValue = estimatedTotalAssets();
         uint256 fraction = (_amount).mul(1e18).div(balanceOfNFT());
 
         (,,,,,,,uint256 initLiquidity,,,,) = IUniNFT(uniNFT).positions(token_id);
@@ -447,12 +444,6 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
 
         uint256 _timestamp = block.timestamp;
         uint256 deadline = _timestamp.add(5*60);
-
-        // should be set at some value for slippage.  Currently at 1 for testing
-        //TODO: see above
-        // maybe _amount.mul(1e5).div(2e5).mul(9e4).div(1e5)
-        //uint256 amount0Min = 0;
-        //uint256 amount1Min = 0;
 
         if (emergencyExit) {
             liquidityRemove = initLiquidity;
@@ -484,13 +475,9 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
         uint256 wantBalance = IERC20(want).balanceOf(address(this));
 
         _curveSwapToWant(fraxBalance);
-        //uint256 wantBalanceNew = IERC20(want).balanceOf(address(this));
 
         uint256 difference = balanceOfWant().sub(balanceOfWantBefore);
 
-        //uint256 NFTDifference = (_balanceOfNFT).sub(difference);
-
-        //updateNFTValue(NFTDifference);
 
         return difference;
     }
@@ -723,6 +710,31 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
                 TickMath.getSqrtRatioAtTick(tickUpper),
                 liquidity
             );
+    }
+
+    // below for 0.4.3 upgrade
+    function ethToWant(uint256 _amtInWei)
+        public
+        view
+        override
+        returns (uint256)
+    {
+        address[] memory path = new address[](2);
+        path[0] = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2); // weth
+        path[1] = address(want);
+
+        uint256[] memory amounts = IUni(unirouter).getAmountsOut(_amtInWei, path);
+
+        return amounts[amounts.length - 1];
+    }
+
+    function liquidateAllPositions()
+        internal
+        override
+        returns (uint256 _amountFreed)
+    {
+        //shouldn't matter, logic is already in liquidatePosition
+        (_amountFreed, ) = liquidatePosition(420_69);
     }
 
 }
