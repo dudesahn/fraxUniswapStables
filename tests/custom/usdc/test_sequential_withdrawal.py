@@ -3,6 +3,7 @@
 #           - strategy loading and unloading (via Vault addStrategy/revokeStrategy)
 #           - change in loading (from low to high and high to low)
 #           - strategy operation at different loading levels (anticipated and "extreme")
+
 import pytest
 
 from brownie import Wei, accounts, Contract, config
@@ -93,10 +94,6 @@ def test_operation(
     chain.sleep(3600 * 1)
     chain.mine(1)
 
-    strategy.setEmergencyExit({"from": gov})
-    strategy.harvest({"from": gov})
-    chain.mine(1)
-
     alice_vault_balance = vault.balanceOf(alice)
     vault.withdraw(alice_vault_balance, alice, 75, {"from": alice})
     assert usdc.balanceOf(alice) > 0
@@ -114,4 +111,4 @@ def test_operation(
     #assert usdc.balanceOf(strategy) == 0
 
     # We should have made profit
-    #assert vault.pricePerShare() > 1e6
+    assert vault.pricePerShare() > 1e6

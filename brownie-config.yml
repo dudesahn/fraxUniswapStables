@@ -10,6 +10,8 @@ autofetch_sources: True
 dependencies:
   - iearn-finance/yearn-vaults@0.3.2
   - OpenZeppelin/openzeppelin-contracts@3.1.0
+  - Uniswap/v3-periphery@1.3.0
+  - Uniswap/v3-core@1.0.0
 
 # path remapping to support imports from GitHub/NPM
 compiler:
@@ -18,6 +20,8 @@ compiler:
     remappings:
       - "@yearnvaults=iearn-finance/yearn-vaults@0.3.2"
       - "@openzeppelin=OpenZeppelin/openzeppelin-contracts@3.1.0"
+      - "@uniswap-periphery=Uniswap/v3-periphery@1.3.0"
+      - "@uniswap-core=Uniswap/v3-core@1.0.0"
 
 reports:
   exclude_contracts:

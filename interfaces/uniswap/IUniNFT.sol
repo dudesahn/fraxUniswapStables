@@ -76,7 +76,7 @@ interface IUniNFT {
         uint256 token_id;
         address recipient;
         uint128 amount0Max;
-        uint256 amount1Max;
+        uint128 amount1Max;
     }
 
     function collect(collectStruct calldata params) external payable returns(
