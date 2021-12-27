@@ -155,7 +155,7 @@ def newstrategy(
 ):
     newstrategy = guardian.deploy(
         StrategyFraxUniswap,
-        gov,
+        vault,
         frax,
         fxs,
         uni,
