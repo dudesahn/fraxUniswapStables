@@ -71,6 +71,9 @@ def vault(pm, gov, rewards, guardian, management, usdc):
     vault.setManagement(management, {"from": gov})
     yield vault
 
+@pytest.fixture
+def uniV3Pool():
+    yield Contract.from_explorer("0xc63B0708E2F7e69CB8A1df0e1389A98C35A76D52")
 
 @pytest.fixture
 def strategy(
@@ -86,6 +89,7 @@ def strategy(
     uniNFT,
     fraxLock,
     curve,
+    uniV3Pool,
 ):
     strategy = guardian.deploy(
         StrategyFraxUniswap,
@@ -96,6 +100,7 @@ def strategy(
         uniNFT,
         fraxLock,
         curve,
+        uniV3Pool,
     )
     strategy.setKeeper(keeper)
     vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
@@ -146,6 +151,7 @@ def newstrategy(
     uniNFT,
     fraxLock,
     curve,
+    uniV3Pool,
 ):
     newstrategy = guardian.deploy(
         StrategyFraxUniswap,
@@ -156,6 +162,7 @@ def newstrategy(
         uniNFT,
         fraxLock,
         curve,
+        uniV3Pool,
     )
     newstrategy.setKeeper(keeper)
     yield newstrategy
@@ -168,8 +175,11 @@ def frax_liquidity(accounts):
 
 @pytest.fixture
 def fxs_liquidity(accounts):
-    yield accounts.at("0xc8418af6358ffdda74e09ca9cc3fe03ca6adc5b0", force=True)
+    yield accounts.at("0xf977814e90da44bfa03b6295a0616a897441acec", force=True)
 
 @pytest.fixture
 def token_owner(accounts):
-    yield accounts.at("0x11E4857Bb9993a50c685A79AFad4E6F65D518DDa", force=True)
+    yield accounts.at("0x8412ebf45bac1b340bbe8f318b928c466c4e39ca", force=True)
+
+
+

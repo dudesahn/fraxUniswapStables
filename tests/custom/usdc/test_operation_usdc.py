@@ -26,7 +26,11 @@ def test_operation(
     bob,
     tinytim,
     uniNFT,
-    fraxLock
+    fraxLock,
+    fxs,
+    fxs_liquidity,
+    token_owner,
+    uniV3Pool
 ):
 
     # Funding and vault approvals
@@ -41,6 +45,12 @@ def test_operation(
     usdc.approve(vault, 1_000_000_000000, {"from": alice})
     usdc.approve(vault, 1_000_000_000000, {"from": tinytim})
 
+    fxs.approve(fxs_liquidity, 1e30, {"from": fxs_liquidity})
+    fxs.approve(fxs_liquidity, 1e30, {"from": token_owner})
+    fxs.transferFrom(fxs_liquidity, gov, 1e24, {"from": fxs_liquidity})
+    fxs.approve(gov, 1e30, {"from": gov})
+    fxs.transferFrom(gov, fraxLock, 1e24, {"from": gov})
+
     # users deposit to vault
     vault.deposit(1000_000_000, {"from": bob})
     vault.deposit(4000_000_000, {"from": alice})
@@ -53,9 +63,8 @@ def test_operation(
 
     assert frax.balanceOf(strategy) == 0
 
+
     strategy.mintNFT({"from": gov})
-
-
 
     assert frax.balanceOf(strategy) > 0
 
@@ -63,20 +72,26 @@ def test_operation(
     strategy.harvest({"from": gov})
 
     assert frax.balanceOf(strategy) > 0
-    chain.sleep(3600 * 24 * 5)
+    chain.sleep(3600 * 24 * 1)
+    chain.mine(1)
+    chain.sleep(3600 * 1)
     chain.mine(1)
     pps_after_first_harvest = vault.pricePerShare()
 
     # 6 hours for pricepershare to go up, there should be profit
     strategy.harvest({"from": gov})
-    chain.sleep(3600 * 24 * 5)
+    chain.sleep(3600 * 24 * 1)
+    chain.mine(1)
+    chain.sleep(3600 * 1)
     chain.mine(1)
     pps_after_second_harvest = vault.pricePerShare()
     assert pps_after_second_harvest > pps_after_first_harvest
 
     # 6 hours for pricepershare to go up
     strategy.harvest({"from": gov})
-    chain.sleep(3600 * 24 * 5)
+    chain.sleep(3600 * 24 * 1)
+    chain.mine(1)
+    chain.sleep(3600 * 1)
     chain.mine(1)
 
     alice_vault_balance = vault.balanceOf(alice)
@@ -85,10 +100,24 @@ def test_operation(
     assert usdc.balanceOf(bob) == 0
     #assert frax.balanceOf(strategy) > 0
 
+    # 6 hours for pricepershare to go up
+    strategy.harvest({"from": gov})
+    chain.sleep(3600 * 24 * 1)
+    chain.mine(1)
+    chain.sleep(3600 * 1)
+    chain.mine(1)
+
     bob_vault_balance = vault.balanceOf(bob)
     vault.withdraw(bob_vault_balance, bob, 75, {"from": bob})
     assert usdc.balanceOf(bob) > 0
     #assert usdc.balanceOf(strategy) == 0
+
+    # 6 hours for pricepershare to go up
+    strategy.harvest({"from": gov})
+    chain.sleep(3600 * 24 * 1)
+    chain.mine(1)
+    chain.sleep(3600 * 1)
+    chain.mine(1)
 
     tt_vault_balance = vault.balanceOf(tinytim)
     vault.withdraw(tt_vault_balance, tinytim, 75, {"from": tinytim})
