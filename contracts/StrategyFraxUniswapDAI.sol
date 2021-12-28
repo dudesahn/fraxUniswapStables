@@ -474,9 +474,9 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
         uint256 fraxTrue = IERC20(frax).balanceOf(address(this));
         //hard-coding for testing
         // USDC=Tether=6, frax=dai=18,
-        // therefore 18-6 = 12
+        // therefore 18-18 = 0
 
-        return fraxTrue.div(1e12);
+        return fraxTrue.div(1e0);
     }
 
     // returns balance of NFT - cannot calculate on-chain so this is a running value
@@ -486,7 +486,8 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
 
         (uint256 amount0, uint256 amount1) = principal(sqrtPriceX96);
 
-        uint256 fraxRebase = amount0.div(1e12);
+        // dai and frax have same decimals, unnecessary
+        //uint256 fraxRebase = amount0.div(1e12);
 
         return fraxRebase.add(amount1);
 
@@ -513,14 +514,14 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
         // sets a slippage tolerance of 0.5%
         //uint256 _amountOut = _amountIn.mul(9950).div(10000);
         // USDC is 2, DAI is 1, Tether is 3, frax is 0
-            ICurveFi(curve).exchange_underlying(2, 0, _amountIn, 0);
+            ICurveFi(curve).exchange_underlying(1, 0, _amountIn, 0);
     }
 
     function _curveSwapToWant(uint256 _amountIn) internal {
         // sets a slippage tolerance of 0.5%
        //uint256 _amountOut = _amountIn.mul(9950).div(10000);
         // USDC is 2, DAI is 1, Tether is 3, frax is 0
-            ICurveFi(curve).exchange_underlying(0, 2, _amountIn, 0);
+            ICurveFi(curve).exchange_underlying(0, 1, _amountIn, 0);
     }
 
     // to use in case the frax:want ratio slips significantly away from 1:1
@@ -528,14 +529,14 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
         // sets a slippage tolerance of 0.5%
         uint256 _amountOut = _amountIn.mul(9950).div(10000);
         // USDC is 2, DAI is 1, Tether is 3, frax is 0
-            ICurveFi(curve).exchange_underlying(2, 0, _amountIn, _amountOut);
+            ICurveFi(curve).exchange_underlying(1, 0, _amountIn, _amountOut);
     }
 
     function _externalSwapToWant(uint256 _amountIn) external onlyGovernance {
         // sets a slippage tolerance of 0.5%
         uint256 _amountOut = _amountIn.mul(9950).div(10000);
         // USDC is 2, DAI is 1, Tether is 3, frax is 0
-            ICurveFi(curve).exchange_underlying(0, 2, _amountIn, _amountOut);
+            ICurveFi(curve).exchange_underlying(0, 1, _amountIn, _amountOut);
     }
 
     // claims rewards if unlocked
@@ -603,6 +604,7 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
         uint256 deadline = timestamp.add(5*60);
 
         // may want to make these settable
+        //TODO: FRAX/DAI
         // values for FRAX/USDC
         //uint24 fee = 500;
         //int24 tickLower = (-276380);
