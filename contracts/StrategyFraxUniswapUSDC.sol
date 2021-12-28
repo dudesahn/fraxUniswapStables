@@ -311,13 +311,7 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
             return;
         }
 
-        address nftOwner = IUniNFT(uniNFT).ownerOf(token_id);
-
-        if (nftOwner == address(fraxLock)) {
-            IFrax(fraxLock).withdrawLocked(
-                token_id
-            );
-        }
+        nftUnlock();
 
         uint256 _balanceOfWant = balanceOfWant();
 
@@ -399,10 +393,7 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
         uint256 balanceOfWantBefore = balanceOfWant();
         uint256 balanceOfFraxBefore = IERC20(frax).balanceOf(address(this));
 
-        address nftOwner = IUniNFT(uniNFT).ownerOf(token_id);
-        if (nftOwner == address(fraxLock)) {
-            IFrax(fraxLock).withdrawLocked(token_id);
-        }
+        nftUnlock();
 
         uint256 fraction = (_amount).mul(1e18).div(balanceOfNFT());
 
@@ -462,6 +453,9 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
             _newStrategy,
             IERC20(fxs).balanceOf(address(this))
         );
+
+       nftUnlock();
+
         IERC721(uniNFT).transferFrom(
             address(this),
             _newStrategy,
@@ -650,6 +644,13 @@ contract StrategyFraxUniswap is BaseStrategyInitializable {
                 TickMath.getSqrtRatioAtTick(tickUpper),
                 liquidity
             );
+    }
+
+    function nftUnlock() internal {
+        address nftOwner = IUniNFT(uniNFT).ownerOf(token_id);
+        if (nftOwner == address(fraxLock)) {
+            IFrax(fraxLock).withdrawLocked(token_id);
+        }
     }
 
     // below for 0.4.3 upgrade

@@ -95,10 +95,11 @@ def test_operation(
     chain.sleep(3600 * 1)
     chain.mine(1)
 
+    assert uniNFT.balanceOf(newstrategy) == 0
 
     newstrategy.setStrategist(strategist)
     vault.migrateStrategy(strategy, newstrategy, {"from": gov})
 
     assert frax.balanceOf(strategy) == 0
     assert frax.balanceOf(newstrategy) > 0
-    assert newstrategy.token_id > 1
+    assert uniNFT.balanceOf(newstrategy) > 0
