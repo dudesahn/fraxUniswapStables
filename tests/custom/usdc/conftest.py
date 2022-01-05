@@ -81,7 +81,7 @@ def strategy(
     guardian,
     keeper,
     vault,
-    StrategyFraxUniswap,
+    StrategyFraxUniswapUSDC,
     gov,
     frax,
     fxs,
@@ -92,7 +92,7 @@ def strategy(
     uniV3Pool,
 ):
     strategy = guardian.deploy(
-        StrategyFraxUniswap,
+        StrategyFraxUniswapUSDC,
         vault,
         frax,
         fxs,
@@ -143,7 +143,7 @@ def newstrategy(
     guardian,
     keeper,
     vault,
-    StrategyFraxUniswap,
+    StrategyFraxUniswapUSDC,
     gov,
     frax,
     fxs,
@@ -154,7 +154,7 @@ def newstrategy(
     uniV3Pool,
 ):
     newstrategy = guardian.deploy(
-        StrategyFraxUniswap,
+        StrategyFraxUniswapUSDC,
         vault,
         frax,
         fxs,

@@ -66,7 +66,7 @@ def dai():
 def vault(pm, gov, rewards, guardian, management, dai):
     Vault = pm(config["dependencies"][0]).Vault
     vault = guardian.deploy(Vault)
-    vault.initialize(usdc, gov, rewards, "", "", guardian)
+    vault.initialize(dai, gov, rewards, "", "", guardian)
     vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
     vault.setManagement(management, {"from": gov})
     yield vault
@@ -81,7 +81,7 @@ def strategy(
     guardian,
     keeper,
     vault,
-    StrategyFraxUniswap,
+    StrategyFraxUniswapDAI,
     gov,
     frax,
     fxs,
@@ -92,7 +92,7 @@ def strategy(
     uniV3Pool,
 ):
     strategy = guardian.deploy(
-        StrategyFraxUniswap,
+        StrategyFraxUniswapDAI,
         vault,
         frax,
         fxs,
@@ -143,7 +143,7 @@ def newstrategy(
     guardian,
     keeper,
     vault,
-    StrategyFraxUniswap,
+    StrategyFraxUniswapDAI,
     gov,
     frax,
     fxs,
@@ -154,7 +154,7 @@ def newstrategy(
     uniV3Pool,
 ):
     newstrategy = guardian.deploy(
-        StrategyFraxUniswap,
+        StrategyFraxUniswapDAI,
         vault,
         frax,
         fxs,

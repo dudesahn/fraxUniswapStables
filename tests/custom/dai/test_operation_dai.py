@@ -7,7 +7,7 @@
 import pytest
 
 from brownie import Wei, accounts, Contract, config
-from brownie import StrategyFraxUniswap
+from brownie import StrategyFraxUniswapDAI
 
 
 @pytest.mark.require_network("mainnet-fork")
@@ -35,15 +35,15 @@ def test_operation(
 
     # Funding and vault approvals
     # Can be also done from the conftest and remove dai_liquidity from here
-    dai.approve(dai_liquidity, 1_000_000_000000, {"from": dai_liquidity})
-    dai.transferFrom(dai_liquidity, gov, 300_000_000000, {"from": dai_liquidity})
-    dai.approve(gov, 1_000_000_000000, {"from": gov})
-    dai.transferFrom(gov, bob, 1000_000000, {"from": gov})
-    dai.transferFrom(gov, alice, 4000_000000, {"from": gov})
-    dai.transferFrom(gov, tinytim, 10_000000, {"from": gov})
-    dai.approve(vault, 1_000_000_000000, {"from": bob})
-    dai.approve(vault, 1_000_000_000000, {"from": alice})
-    dai.approve(vault, 1_000_000_000000, {"from": tinytim})
+    dai.approve(dai_liquidity, 1_000_000e18, {"from": dai_liquidity})
+    dai.transferFrom(dai_liquidity, gov, 300_000e18, {"from": dai_liquidity})
+    dai.approve(gov, 1_000_000e18, {"from": gov})
+    dai.transferFrom(gov, bob, 1000e18, {"from": gov})
+    dai.transferFrom(gov, alice, 4000e18, {"from": gov})
+    dai.transferFrom(gov, tinytim, 10e18, {"from": gov})
+    dai.approve(vault, 1_000_000e18, {"from": bob})
+    dai.approve(vault, 1_000_000e18, {"from": alice})
+    dai.approve(vault, 1_000_000e18, {"from": tinytim})
 
     fxs.approve(fxs_liquidity, 1e30, {"from": fxs_liquidity})
     fxs.approve(fxs_liquidity, 1e30, {"from": token_owner})
@@ -52,26 +52,26 @@ def test_operation(
     fxs.transferFrom(gov, fraxLock, 1e24, {"from": gov})
 
     # users deposit to vault
-    vault.deposit(1000_000_000, {"from": bob})
-    vault.deposit(4000_000_000, {"from": alice})
-    vault.deposit(10_000_000, {"from": tinytim})
+    vault.deposit(1000e18, {"from": bob})
+    vault.deposit(4000e18, {"from": alice})
+    vault.deposit(10e18, {"from": tinytim})
 
     vault.setManagementFee(0, {"from": gov})
     vault.setPerformanceFee(0, {"from": gov})
 
-    dai.transferFrom(dai_liquidity, strategy, 100_000000, {"from": dai_liquidity})
+    dai.transferFrom(dai_liquidity, strategy, 100e18, {"from": dai_liquidity})
 
     assert frax.balanceOf(strategy) == 0
 
 
     strategy.mintNFT({"from": gov})
 
-    assert frax.balanceOf(strategy) > 0
+    #assert frax.balanceOf(strategy) > 0
 
     # First harvest
     strategy.harvest({"from": gov})
 
-    assert frax.balanceOf(strategy) > 0
+    #assert frax.balanceOf(strategy) > 0
     chain.sleep(3600 * 24 * 1)
     chain.mine(1)
     chain.sleep(3600 * 1)

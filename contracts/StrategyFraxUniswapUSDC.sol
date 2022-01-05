@@ -26,14 +26,14 @@ import "../../libraries/SafeCast.sol";
 import "../../libraries/SqrtPriceMath.sol";
 import "../../libraries/TickMath.sol";
 import "../../libraries/LiquidityAmounts.sol";
-//import "..\..\YearnV2-Generic-Lev-Comp-Farm\contracts\Interfaces\Maker\Maker.sol";
+
 
 
 interface IName {
     function name() external view returns (string memory);
 }
 
-contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
+contract StrategyFraxUniswapUSDC is BaseStrategyInitializable {
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
@@ -203,7 +203,7 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
             newStrategy := create(0, clone_code, 0x37)
         }
 
-        StrategyFraxUniswapDAI(newStrategy).initialize(
+        StrategyFraxUniswapUSDC(newStrategy).initialize(
             _vault,
             _strategist,
             _rewards,
@@ -336,8 +336,8 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
 
             IUniNFT.increaseStruct memory setIncrease = IUniNFT.increaseStruct(
                 token_id,
-                wantBal,
                 fraxBal,
+                wantBal,
                 0,
                 0,
                 deadline);
@@ -474,9 +474,9 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
         uint256 fraxTrue = IERC20(frax).balanceOf(address(this));
         //hard-coding for testing
         // USDC=Tether=6, frax=dai=18,
-        // therefore 18-18 = 0
+        // therefore 18-6 = 12
 
-        return fraxTrue.div(1e0);
+        return fraxTrue.div(1e12);
     }
 
     // returns balance of NFT - cannot calculate on-chain so this is a running value
@@ -486,10 +486,9 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
 
         (uint256 amount0, uint256 amount1) = principal(sqrtPriceX96);
 
-        // dai and frax have same decimals, unnecessary
-        //uint256 fraxRebase = amount0;//.div(1e12);
+        uint256 fraxRebase = amount0.div(1e12);
 
-        return amount0.add(amount1);
+        return fraxRebase.add(amount1);
 
     }
 
@@ -514,14 +513,14 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
         // sets a slippage tolerance of 0.5%
         //uint256 _amountOut = _amountIn.mul(9950).div(10000);
         // USDC is 2, DAI is 1, Tether is 3, frax is 0
-            ICurveFi(curve).exchange_underlying(1, 0, _amountIn, 0);
+            ICurveFi(curve).exchange_underlying(2, 0, _amountIn, 0);
     }
 
     function _curveSwapToWant(uint256 _amountIn) internal {
         // sets a slippage tolerance of 0.5%
        //uint256 _amountOut = _amountIn.mul(9950).div(10000);
         // USDC is 2, DAI is 1, Tether is 3, frax is 0
-            ICurveFi(curve).exchange_underlying(0, 1, _amountIn, 0);
+            ICurveFi(curve).exchange_underlying(0, 2, _amountIn, 0);
     }
 
     // to use in case the frax:want ratio slips significantly away from 1:1
@@ -529,14 +528,14 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
         // sets a slippage tolerance of 0.5%
         uint256 _amountOut = _amountIn.mul(9950).div(10000);
         // USDC is 2, DAI is 1, Tether is 3, frax is 0
-            ICurveFi(curve).exchange_underlying(1, 0, _amountIn, _amountOut);
+            ICurveFi(curve).exchange_underlying(2, 0, _amountIn, _amountOut);
     }
 
     function _externalSwapToWant(uint256 _amountIn) external onlyGovernance {
         // sets a slippage tolerance of 0.5%
         uint256 _amountOut = _amountIn.mul(9950).div(10000);
         // USDC is 2, DAI is 1, Tether is 3, frax is 0
-            ICurveFi(curve).exchange_underlying(0, 1, _amountIn, _amountOut);
+            ICurveFi(curve).exchange_underlying(0, 2, _amountIn, _amountOut);
     }
 
     // claims rewards if unlocked
@@ -604,23 +603,19 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
         uint256 deadline = timestamp.add(5*60);
 
         // may want to make these settable
-        // values for FRAX/Dai
-        //uint24 fee = 500;
-        //int24 tickLower = (-50);
-        //int24 tickUpper = (50);
         // values for FRAX/USDC
         //uint24 fee = 500;
         //int24 tickLower = (-276380);
         //int24 tickUpper = (-276270);
 
         IUniNFT.nftStruct memory setNFT = IUniNFT.nftStruct(
-            address(want),
             address(frax),
+            address(want),
             500,
-            (-50),
-            50,
-            wantBalance,
+            (-276380),
+            (-276270),
             fraxBalance,
+            wantBalance,
             0,
             0,
             address(this),
