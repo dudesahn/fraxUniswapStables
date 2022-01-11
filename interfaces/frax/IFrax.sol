@@ -2,26 +2,25 @@
 pragma solidity 0.6.12;
 
 interface IFrax {
-
     function earned(address account)
-        external
-        view
-        returns (uint256 profit);
+    external
+    view
+    returns (uint256 profit);
 
     function combinedWeightOf(address account)
-        external
-        view
-        returns (uint256 amount);
+    external
+    view
+    returns (uint256 amount);
 
     function userStakedFrax(address account)
-        external
-        view
-        returns (uint256 stakedFrax);
+    external
+    view
+    returns (uint256 stakedFrax);
 
     function veFXSMultiplier(address account)
-        external
-        view
-        returns (uint256 multiplier);
+    external
+    view
+    returns (uint256 multiplier);
 
     function withdrawalsPaused() external view returns (bool);
 
@@ -30,5 +29,9 @@ interface IFrax {
     function withdrawLocked(uint256 token_id) external;
 
     function getReward() external;
+
+    // TODO: Add function rewardsCollectionPaused()
+
+    // TODO: Add function earned()
 
 }
