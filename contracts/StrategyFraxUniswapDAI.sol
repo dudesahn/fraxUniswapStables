@@ -61,8 +61,13 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
     address public treasury;
     address public curve;
     address public uniV3Pool;
-    // TODO: uint8 public curveIndexFrax;
-    // TODO: uint8 public curveIndexWant;
+    uint24 public fee;
+    int24 public tickLower;
+    int24 public tickUpper;
+    uint8 public curveIndexFrax;
+    uint8 public curveIndexWant;
+
+
 
     constructor(
         address _vault,
@@ -72,7 +77,12 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
         address _uniNFT,
         address _fraxLock,
         address _curve,
-        address _uniV3Pool
+        address _uniV3Pool,
+        uint24 _fee,
+        int24 _tickLower,
+        int24 _tickUpper,
+        uint8 _curveIndexFrax,
+        uint8 _curveIndexWant
     ) public BaseStrategyInitializable(_vault) {
         // Constructor should initialize local variables
         _initializeThis(
@@ -82,7 +92,12 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
             _uniNFT,
             _fraxLock,
             _curve,
-            _uniV3Pool
+            _uniV3Pool,
+            _fee,
+            _tickLower,
+            _tickUpper,
+            _curveIndexFrax,
+            _curveIndexWant
         );
     }
 
@@ -94,7 +109,7 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
         address _uniNFT,
         address _fraxLock,
         address _curve,
-        address _uniV3Pool
+        address _uniV3Pool,
     ) internal {
         require(
             address(frax) == address(0),
@@ -113,7 +128,7 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
         percentKeep = 1000;
         // TODO: These seem to be old? https://gnosis-safe.io/app/eth:0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52/balances
         // ^^ was using the Treasury vault. Can change these to whatever the current address is.
-        //Will be used in veFRAX voterproxy in the future, so the best may be SMS.
+        // Will be used in veFRAX voterproxy in the future, so the best may be SMS.
         refer = address(0x93A62dA5a14C80f265DAbC077fCEE437B1a0Efde);
         treasury = address(0x93A62dA5a14C80f265DAbC077fCEE437B1a0Efde);
         // TODO: Math.min(fraxLock.lock_time_min(), 86400);
@@ -123,6 +138,7 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
         tokenId = 0;
 
         // TODO: Iterate through curve pool to find indices of want and frax
+        // ^^ passing them in as constructor
 
 
         // setting maxVar
@@ -312,7 +328,7 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
         uint256 totalBalBefore = balanceOfWant().add(valueOfFrax());
         uint256 debt = vault.strategies(address(this)).totalDebt;
 
-        claimReward();
+        _claimReward();
 
         uint256 _tokensAvailable = IERC20(fxs).balanceOf(address(this));
         if (_tokensAvailable > 0) {
@@ -347,6 +363,10 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
             return;
         }
 
+        if(tokenId == 0) {
+            _mintNFT();
+        }
+
         nftUnlock();
 
         uint256 _balanceOfWant = balanceOfWant();
@@ -363,9 +383,8 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
         uint256 _wantAvailable = _balanceOfWant.sub(_debtOutstanding);
         if (_wantAvailable > 0) {
             // need to swap half want to frax
-            // TODO: Same here, 1e6/2e6 = /2
-            uint256 halfWant = _wantAvailable.mul(1e6).div(2e6);
-            _curveSwapToFrax(halfWant);
+            uint256 halfWant = _wantAvailable.div(2);
+            _curveSwap(halfWant, want, frax);
             uint256 fraxBal = IERC20(frax).balanceOf(address(this));
             uint256 wantBal = IERC20(want).balanceOf(address(this));
 
@@ -465,7 +484,7 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
 
         IUniNFT(uniNFT).collect(collectParams);
 
-        _curveSwapToWant(IERC20(frax).balanceOf(address(this));
+        _curveSwap(IERC20(frax).balanceOf(address(this), frax, want);
         return balanceOfWant().sub(balanceOfWantBefore);
     }
 
@@ -501,15 +520,14 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
     // TODO: Optional: Add public function balanceOfReward() for fxs.balanceOf(address(this)) replace use of IERC(token).balanceOf(address(this))
 
     // returns balance of frax, denominated in same dec as want
-    // TODO: Rename valueOfFrax. Balance of frax means more frax.balanceOf(address(this))
-    function valueOfFrax() public view returns (uint256) //noinspection NoReturn {
+    function valueOfFrax() public view returns (uint256) {
         uint256 fraxTrue = IERC20(frax).balanceOf(address(this));
         //hard-coding for testing
         // USDC=Tether=6, frax=dai=18,
 
-        // TODO: Convert in terms of want. Assuming 1:1 stable:frax
-         uint decFrax = ERC20(frax).decimals()
-         uint decWant = ERC20(want).decimals()
+        // Convert in terms of want. Assuming 1:1 stable:frax
+         uint decFrax = ERC20(frax).decimals();
+         uint decWant = ERC20(want).decimals();
             if(decFrax > decWant){
                 return fraxTrue.div(10 ** (decFrax.sub(decWant)));
             }else{
@@ -517,33 +535,40 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
             }
     }
 
-    // Question: What does running value mean?
-    // returns balance of NFT - cannot calculate on-chain so this is a running value
+    // returns balance of NFT
     function balanceOfNFT() public view returns (uint256) {
 
         (uint160 sqrtPriceX96,,,,,,) = IUniV3Pool(uniV3Pool).slot0();
 
         (uint256 amount0, uint256 amount1) = principal(sqrtPriceX96);
 
-        // dai and frax have same decimals, unnecessary
-        //uint256 fraxRebase = amount0;//.div(1e12);
+        uint256 fraxTrue;
+        // figure out which amount is for frax
+        if (token0 == frax) {
+            fraxTrue = amount0;
+        }else{
+            fraxTrue = amount1;
+        }
 
-        // TODO: Convert in terms of want. Assuming 1:1 stable:frax
-        // uint decFrax = ERC20(frax).decimals()
-        // uint decWant = ERC20(want).decimals()
-        //        if(decFrax > decWant){
-        //            return fraxTrue.div(10 ** (decFrax.sub(decWant)));
-        //        }else{
-        //            return fraxTrue.mul(10 ** (decWant.sub(decFrax)));
-        //        }
+        // Convert in terms of want. Assuming 1:1 stable:frax
+        uint decFrax = ERC20(frax).decimals();
+        uint decWant = ERC20(want).decimals();
+        uint256 fraxRebase;
+        if(decFrax > decWant){
+                fraxRebase = fraxTrue.div(10 ** (decFrax.sub(decWant)));
+            }else{
+                fraxRebase = fraxTrue.mul(10 ** (decWant.sub(decFrax)));
+        }
 
-        return amount0.add(amount1);
-
+        if (token0 == frax) {
+            return fraxRebase.add(amount1);
+        }else{
+            return fraxRebase.add(amount0);
+        }
     }
 
-    // Question: Why sell FXS on V2 when V3 interfaces are all set up?
     // swaps rewarded tokens for want
-    // uses UniV2. May want to include Sushi / UniV3
+    // uses UniV2, which has deepest liq at time of publish
     function _swap(uint256 _amountIn, address _token) internal {
         address[] memory path = new address[](3);
         path[0] = _token;
@@ -561,58 +586,53 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
         );
     }
 
-    // TODO: Consolidate to one function
-    // TODO: Move indices to function param _curveSwapToFrax(uint256 _amountIn, uint8 _indexIn, uint8 _indexOut)
-    function _curveSwapToFrax(uint256 _amountIn) internal {
-        // sets a slippage tolerance of 0.5%
-        //uint256 _amountOut = _amountIn.mul(9950).div(10000);
+    function _curveSwap(uint256 _amountIn, address _tokenIn, address _tokenOut) internal {
         // USDC is 2, DAI is 1, Tether is 3, frax is 0
-        ICurveFi(curve).exchange_underlying(1, 0, _amountIn, 0);
+        if(_tokenIn == address(dai)) {
+            uint8 _indexIn = 1;
+        } else if(_tokenIn == address(usdc)) {
+            uint8 _indexIn = 2;
+        } else if(_tokenIn == address(tether)) {
+            uint8 _indexIn = 3;
+        } else {
+            uint8 _indexIn = 0;
+        }
+        if(_tokenOut == address(dai)) {
+            uint8 _indexOut = 1;
+        } else if(_tokenOut == address(usdc)) {
+            uint8 _indexOut = 2;
+        } else if(_tokenOut == address(tether)) {
+            uint8 _indexOut = 3;
+        } else {
+            uint8 _indexOut = 0;
+        }
+
+        ICurveFi(curve).exchange_underlying(_indexIn, _indexOut, _amountIn, 0);
     }
 
-    // TODO: Remove
-    function _curveSwapToWant(uint256 _amountIn) internal {
-        // sets a slippage tolerance of 0.5%
-        //uint256 _amountOut = _amountIn.mul(9950).div(10000);
-        // USDC is 2, DAI is 1, Tether is 3, frax is 0
-        ICurveFi(curve).exchange_underlying(0, 1, _amountIn, 0);
-    }
-
-    // TODO: Convention is to have internal function prepended with _ and external functions without.
-    // TODO: Rename to curveSwap(...)
-    // TODO: Descope to onlyVaultManagers
-    // TODO: Add this to natspec `USDC is 2, DAI is 1, Tether is 3, frax is 0` to help executor
-    // TODO: Reuse internal function
     // to use in case the frax:want ratio slips significantly away from 1:1
-    function _externalSwapToFrax(uint256 _amountIn) external onlyGovernance {
-        // sets a slippage tolerance of 0.5%
-        uint256 _amountOut = _amountIn.mul(9950).div(10000);
-        // USDC is 2, DAI is 1, Tether is 3, frax is 0
-        ICurveFi(curve).exchange_underlying(1, 0, _amountIn, _amountOut);
+    /// @notice DAI is 1, USDC is 2, Tether is 3, frax is 0
+    function curveSwap(uint256 _amountIn, uint8 _indexIn, uint8 _indexOut) external onlyVaultManagers {
+        /// @notice DAI is 1, USDC is 2, Tether is 3, frax is 0
+        ICurveFi(curve).exchange_underlying(_indexIn, _indexOut, _amountIn, 0);
     }
 
-    // TODO: Remove this method. Redundant, can be merged with above
-    function _externalSwapToWant(uint256 _amountIn) external onlyGovernance {
-        // sets a slippage tolerance of 0.5%
-        uint256 _amountOut = _amountIn.mul(9950).div(10000);
-        // USDC is 2, DAI is 1, Tether is 3, frax is 0
-        ICurveFi(curve).exchange_underlying(0, 1, _amountIn, _amountOut);
-    }
-
-    // TODO: Convention is to have internal function prepended with _ and external functions without
-    // TODO: Add checks for !rewardsCollectionPaused(), earned() > 0
     // claims rewards if unlocked
-    function claimReward() internal {
-        IFrax(fraxLock).getReward();
+    function _claimReward() internal {
+        if(IFrax(fraxLock).rewardsCollectionPaused() == True){
+            return;
+        }
+        if(IFrax(fraxLock).earned() > 0) {
+            IFrax(fraxLock).getReward();
+         }
     }
 
     function setReferrer(address _refer) external onlyGovernance {
         refer = _refer;
     }
 
-    // TODO: rename _percentKeepInBips or enforce range = [0, 10000]
     // the amount of FXS to keep
-    function setKeep(uint256 _percentKeep) external onlyGovernance {
+    function setKeep(uint256 _percentKeepInBips) external onlyGovernance {
         percentKeep = _percentKeep;
     }
 
@@ -621,63 +641,36 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
         treasury = _treasury;
     }
 
-    // TODO: Non-critical function can be descoped to onlyVaultManagers
-    // sets time locked as a multiple of days. Would recommend values between 1-7.
-    // initial value is set to 1
-    function setFraxTimelock(uint256 _days) external onlyGovernance {
+    // sets time locked as a multiple of days.
+    // initial value is set to 1 day
+    function setFraxTimelock(uint256 _days) external onlyVaultManagers {
         uint256 _secs = _days.mul(86400);
-        // TODO: require(_secs >= fraxLock.lock_time_min)
+        require(_secs >= fraxLock.lock_time_min, "time below minimum required");
         fraxTimelockSet = _secs;
     }
 
-    // TODO: tokenId is set automatically when nft is minted. This setter isn't necessary unless it's meant to be used as an override, in which case, should be descoped to onlyVaultManager
-    // sets the id of the minted NFT. Unknowable until mintNFT is called
-    function setTokenID(uint256 _id) external onlyGovernance {
+    // Override just in case
+    function setTokenID(uint256 _id) external onlyVaultManager {
         tokenId = _id;
-    }
-
-    // TODO: Remove. Unused
-    function convertTo128(uint256 _var) public returns (uint128) {
-        return uint128(_var);
-    }
-
-    // TODO: Remove. Unused
-    function convertTo256(uint128 _var) public returns (uint256) {
-        return uint256(_var);
-    }
-
-    // TODO: Remove. fraxTimelockSet is already a public variable which will autogenerate a getter
-    function readTimeLock() public view returns (uint256) {
-        return fraxTimelockSet;
     }
 
     // TODO: Instead needing to call this separately and manually, why not integrate this into adjustPosition?
     // TODO: You can do something like if(tokenId = 0 && initBalance>0) mintNFT()
     // This function is needed to initialize the entire strategy.
-    // want needs to be airdropped to the strategy in a nominal amount. Say ~1k USD worth.
     // This will run through the process of minting the NFT on UniV3
     // that NFT will be the NFT we use for this strat. We will add/sub balances, but never burn the NFT
     // it will always have dust, accordingly
-    function mintNFT() external onlyGovernance {
-        // TODO: Add require for tokenId == 0
+    function _mintNFT() internal {
+        require(tokenId == 0, "NFT already minted");
         uint256 initBalance = IERC20(want).balanceOf(address(this));
+        require(initBalance >0, "no value to mint");
 
-        if (initBalance == 0) {
-            return;
-        }
+        uint256 swapAmt = initBalance.div(2);
+        // swap want to Frax
+        _curveSwap(swapAmt, want, frax);
 
-        //div(2) with extra decimal accuracy
-        // This doesn't do actually do anything.
-        // Example: 5 * 100000 / 200000 = 5 / 2 = 2
-        uint256 swapAmt = initBalance.mul(1e5).div(2e5);
-        _curveSwapToFrax(swapAmt);
-
-        // TODO: Genericize this
         uint256 token0Balance = IERC20(uniNFT.token0()).balanceOf(address(this));
         uint256 token1Balance = IERC20(uniNFT.token1()).balanceOf(address(this));
-        // uint256 fraxBalance = IERC20(frax).balanceOf(address(this));
-        // uint256 wantBalance = IERC20(want).balanceOf(address(this));
-
         uint256 timestamp = block.timestamp;
         uint256 deadline = timestamp.add(5 * 60);
 
@@ -695,13 +688,14 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
         IUniNFT.nftStruct memory setNFT = IUniNFT.nftStruct(
             uniNFT.token0(),
             uniNFT.token1(),
-        //  address(want),
-        //  address(frax),
-            500,
-            (- 50),
-            50,
-            wantBalance,
-            fraxBalance,
+            //500,
+            //(- 50),
+            //50,
+            fees,
+            lowerTick,
+            upperTick,
+            token0Balance,
+            token1Balance,
             0,
             0,
             address(this),
@@ -714,29 +708,20 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
 
     }
 
-    // TODO: It'll greatly help other devs if you can abstract this out into the library too. This way, we can just reuse the entire folder without further refactoring
-    // turning PositionValue.sol into an internal function
-    // positionManager is uniNFT, tokenId, sqrt
-    function principal(
-    // TODO: Uncomment these
-    //contract uniNFT,
-    //tokenId,
-        uint160 sqrtRatioX96
-    ) internal view returns (uint256 amount0, uint256 amount1) {
-        (, , , , , int24 tickLower, int24 tickUpper, uint128 liquidity, , , ,) = IUniNFT(uniNFT).positions(tokenId);
+    // Calculates principal via PositionValue lib
+    function principal(contract uniNFT, tokenId, uint160 sqrtRatioX96)
+     internal view returns (uint256 amount0, uint256 amount1) {
 
-        return
-        LiquidityAmounts.getAmountsForLiquidity(
-            sqrtRatioX96,
-            TickMath.getSqrtRatioAtTick(tickLower),
-            TickMath.getSqrtRatioAtTick(tickUpper),
-            liquidity
-        );
+        return PositionValue.principal(uniNFT, tokenId, sqrtRatioX96);
+
     }
 
     // TODO: Suggestion if possible, add triggers for harvest and tend when it's free to unlock so that we don't accidentally forfeit the locking rewards
+    // ^^the unlock function here will fail if locked. Not needed.
+    // require(block.timestamp >= thisStake.ending_timestamp || stakesUnlocked == true, "Stake is still locked!")
     function nftUnlock() internal {
-        // TODO: Require(withdrawalsPaused() == false), otherwise migration can happen without the nft transferred, essentially losing our entire position
+        // Require(withdrawalsPaused() == false), otherwise migration can happen without the nft transferred, essentially losing our entire position
+        require (IFrax(fraxLock).withdrawalsPaused() == false, "withdrawals paused")
         address nftOwner = IUniNFT(uniNFT).ownerOf(tokenId);
         if (nftOwner == address(fraxLock)) {
             IFrax(fraxLock).withdrawLocked(tokenId);
@@ -744,6 +729,7 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
     }
 
     // TODO: I recommend just leaving this blank. Not worth to add unirouter just for an estimation, unless V2 has concentrated liquidity
+    // ^^ V2 has the most concentrated liq - so I added this specifically for the 0.4.3 upgrade
     // below for 0.4.3 upgrade
     function ethToWant(uint256 _amtInWei)
     public
@@ -767,8 +753,6 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
     returns (uint256 _amountFreed)
     {
         //shouldn't matter, logic is already in liquidatePosition
-        // TODO: You'll actually want to use a much larger number (rec: uint max) because of this line `if (_balanceOfWant < _amountNeeded)`
-        // TODO: Having credits larger than 42069 would bypass _withdrawSome and break your logic, leaving funds still lp'ed and report large losses during emergency
-        (_amountFreed,) = liquidatePosition(420_69);
+        (_amountFreed,) = liquidatePosition(max256);
     }
 }
