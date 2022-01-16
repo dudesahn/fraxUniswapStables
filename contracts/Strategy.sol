@@ -9,8 +9,9 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/math/Math.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "../../interfaces/openZeppelin/IERC20Metadata.sol";
 
-import {BaseStrategyInitializable} from "@yearn/contracts/BaseStrategy.sol";
+import {BaseStrategy} from "@yearn/contracts/BaseStrategy.sol";
 
 import "../../interfaces/frax/IFrax.sol";
 import "../../interfaces/uniswap/IUniNFT.sol";
@@ -40,7 +41,7 @@ interface IName {
     Use BaseStrategy and factory pattern to clone.
     Example https://github.com/tonkers-kuma/strategy-88mph/blob/ftm-yswaps/contracts/StrategyFactory.sol
 */
-contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
+contract Strategy is BaseStrategy {
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
@@ -52,9 +53,9 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
     uint256 public percentKeep;
     uint256 public fraxTimelockSet;
     uint256 public tokenId;
-    address public constant dai = address(0x6b175474e89094c44da98b954eedeac495271d0f);
-    address public constant usdc = address(0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48);
-    address public constant tether = address(0xdac17f958d2ee523a2206206994597c13d831ec7);
+    address public constant dai = address(0x6B175474E89094C44Da98b954EedeAC495271d0F);
+    address public constant usdc = address(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
+    address public constant tether = address(0xdAC17F958D2ee523a2206206994597C13D831ec7);
     address public frax;
     address public fxs;
     address public unirouter;
@@ -76,9 +77,9 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
         address _curve,
         address _uniV3Pool
 
-    ) public BaseStrategyInitializable(_vault) {
+    ) public BaseStrategy(_vault) {
         // Constructor should initialize local variables
-        _initializeThis(
+        _initializeStrat(
             _frax,
             _fxs,
             _unirouter,
@@ -90,7 +91,7 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
     }
 
     // initializetime
-    function _initializeThis(
+    function _initializeStrat(
         address _frax,
         address _fxs,
         address _unirouter,
@@ -160,7 +161,7 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
     ) internal {
         // Parent initialize contains the double initialize check
         super._initialize(_vault, _strategist, _rewards, _keeper);
-        _initializeThis(
+        _initializeStrat(
             _frax,
             _fxs,
             _unirouter,
@@ -332,7 +333,7 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
         if (_wantAvailable > 0) {
             // need to swap half want to frax
             uint256 halfWant = _wantAvailable.div(2);
-            _curveSwap(halfWant, want, frax);
+            _curveSwap(halfWant, address(want), address(frax));
 
             uint256 token0Balance = IERC20(IFrax(fraxLock).uni_token0()).balanceOf(address(this));
             uint256 token1Balance = IERC20(IFrax(fraxLock).uni_token1()).balanceOf(address(this));
@@ -428,7 +429,7 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
 
         IUniNFT(uniNFT).collect(collectParams);
 
-        _curveSwap(IERC20(frax).balanceOf(address(this), frax, want));
+        _curveSwap(IERC20(frax).balanceOf(address(this)), address(frax), address(want));
         return balanceOfWant().sub(balanceOfWantBefore);
     }
 
@@ -469,8 +470,8 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
         // USDC=Tether=6, frax=dai=18,
 
         // Convert in terms of want. Assuming 1:1 stable:frax
-         uint decFrax = IERC20(frax).decimals();
-         uint decWant = IERC20(want).decimals();
+         uint decFrax = IERC20Metadata(frax).decimals();
+         uint decWant = IERC20Metadata(address(want)).decimals();
             if(decFrax > decWant){
                 return fraxTrue.div(10 ** (decFrax.sub(decWant)));
             }else{
@@ -495,8 +496,8 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
         }
 
         // Convert in terms of want. Assuming 1:1 stable:frax
-        uint decFrax = IERC20(frax).decimals();
-        uint decWant = IERC20(want).decimals();
+        uint decFrax = IERC20Metadata(frax).decimals();
+        uint decWant = IERC20Metadata(address(want)).decimals();
         uint256 fraxRebase;
         if(decFrax > decWant){
                 fraxRebase = fraxTrue.div(10 ** (decFrax.sub(decWant)));
@@ -569,7 +570,7 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
         if(IFrax(fraxLock).rewardsCollectionPaused() == true){
             return;
         }
-        if(IFrax(fraxLock).earned() > 0) {
+        if(IFrax(fraxLock).earned(address(this)) > 0) {
             IFrax(fraxLock).getReward();
          }
     }
@@ -592,8 +593,8 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
     // initial value is set to 7 day
     function setFraxTimelock(uint256 _days) external onlyVaultManagers {
         uint256 _secs = _days.mul(86400);
-        require(_secs >= fraxLock.lock_time_min(), "time below minimum required");
-        require(_secs <= fraxLock.lock_time_for_max_multiplier(), "time exceeds maximum");
+        require(_secs >= IFrax(fraxLock).lock_time_min(), "time below minimum required");
+        require(_secs <= IFrax(fraxLock).lock_time_for_max_multiplier(), "time exceeds maximum");
         fraxTimelockSet = _secs;
     }
 
@@ -618,7 +619,7 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
 
         uint256 swapAmt = initBalance.div(2);
         // swap want to Frax
-        _curveSwap(swapAmt, want, frax);
+        _curveSwap(swapAmt, address(want), address(frax));
 
         uint256 token0Balance = IERC20(IFrax(fraxLock).uni_token0()).balanceOf(address(this));
         uint256 token1Balance = IERC20(IFrax(fraxLock).uni_token1()).balanceOf(address(this));
@@ -658,10 +659,10 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
     }
 
     // Calculates principal via PositionValue lib
-    function principal(uniNFT, tokenId, uint160 sqrtRatioX96)
+    function principal(address _uniNFT, uint256 _tokenId, uint160 _sqrtRatioX96)
      internal view returns (uint256 amount0, uint256 amount1) {
 
-        return PositionValue.principal(uniNFT, tokenId, sqrtRatioX96);
+        return PositionValue.principal(_uniNFT, _tokenId, _sqrtRatioX96);
 
     }
 
@@ -700,7 +701,7 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
     returns (uint256 _amountFreed)
     {
         //shouldn't matter, logic is already in liquidatePosition
-        uint256 max256 = type(256).max;
+        uint256 max256 = type(uint256).max;
         (_amountFreed,) = liquidatePosition(max256);
     }
 }

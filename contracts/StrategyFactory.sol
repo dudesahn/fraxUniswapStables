@@ -2,7 +2,7 @@
 pragma solidity 0.6.12;
 pragma experimental ABIEncoderV2;
 
-import "./StrategyFraxUniswapDAI.sol";
+import "./Strategy.sol";
 
 contract StrategyFactory {
     address public immutable original;
@@ -16,7 +16,7 @@ contract StrategyFactory {
         address _fraxLock,
         address _uniV3Pool
     ) public {
-        StrategyFraxUniswapDAI _original = new Strategy(
+        Strategy _original = new Strategy(
             _vault,
             _uniNFT,
             _fraxLock,
@@ -62,16 +62,11 @@ contract StrategyFactory {
             newStrategy := create(0, clone_code, 0x37)
         }
 
-        StrategyFraxUniswapDai(newStrategy).initialize(
+        Strategy(newStrategy).initialize(
             _vault,
             _uniNFT,
             _fraxLock,
-            _uniV3Pool,
-            _fee,
-            _tickLower,
-            _tickUpper,
-            _curveIndexFrax,
-            _curveIndexWant);
+            _uniV3Pool);
         emit Cloned(newStrategy);
     }
 }
