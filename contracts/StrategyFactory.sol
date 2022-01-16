@@ -14,23 +14,13 @@ contract StrategyFactory {
         address _vault,
         address _uniNFT,
         address _fraxLock,
-        address _uniV3Pool,
-        uint24 _fee,
-        int24 _tickLower,
-        int24 _tickUpper,
-        uint8 _curveIndexFrax,
-        uint8 _curveIndexWant
+        address _uniV3Pool
     ) public {
-        Strategy _original = new Strategy(
+        StrategyFraxUniswapDAI _original = new Strategy(
             _vault,
             _uniNFT,
             _fraxLock,
-            _uniV3Pool,
-            _fee,
-            _tickLower,
-            _tickUpper,
-            _curveIndexFrax,
-            _curveIndexWant);
+            _uniV3Pool);
         emit Deployed(address(_original));
 
         original = address(_original);
@@ -59,12 +49,7 @@ contract StrategyFactory {
         address _uniNFT,
         address _fraxLock,
         address _curve,
-        address _uniV3Pool,
-        uint24 _fee,
-        int24 _tickLower,
-        int24 _tickUpper,
-        uint8 _curveIndexFrax,
-        uint8 _curveIndexWant
+        address _uniV3Pool
     ) external returns (address payable newStrategy) {
         // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
         bytes20 addressBytes = bytes20(original);
@@ -77,7 +62,7 @@ contract StrategyFactory {
             newStrategy := create(0, clone_code, 0x37)
         }
 
-        Strategy(newStrategy).initialize(
+        StrategyFraxUniswapDai(newStrategy).initialize(
             _vault,
             _uniNFT,
             _fraxLock,

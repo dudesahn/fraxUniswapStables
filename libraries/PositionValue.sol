@@ -11,7 +11,7 @@ import "../../interfaces/uniswap/IUniNFT.sol";
 /// @notice Provides functions for computing position value
 library PositionValue {
 
-    function principal(contract uniNFT, tokenId, uint160 sqrtRatioX96)
+    function principal(address uniNFT, uint256 tokenId, uint160 sqrtRatioX96)
      internal view returns (uint256 amount0, uint256 amount1) {
 
         (, , , , , int24 tickLower, int24 tickUpper, uint128 liquidity, , , ,) = IUniNFT(uniNFT).positions(tokenId);

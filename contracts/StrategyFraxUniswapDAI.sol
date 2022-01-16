@@ -26,6 +26,7 @@ import "../../libraries/SafeCast.sol";
 import "../../libraries/SqrtPriceMath.sol";
 import "../../libraries/TickMath.sol";
 import "../../libraries/LiquidityAmounts.sol";
+import "../../libraries/PositionValue.sol";
 //import "..\..\YearnV2-Generic-Lev-Comp-Farm\contracts\Interfaces\Maker\Maker.sol";
 
 
@@ -50,8 +51,10 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
     uint256 public constant _denominator = 10000;
     uint256 public percentKeep;
     uint256 public fraxTimelockSet;
-    // Stick with camel case
     uint256 public tokenId;
+    address public constant dai = address(0x6b175474e89094c44da98b954eedeac495271d0f);
+    address public constant usdc = address(0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48);
+    address public constant tether = address(0xdac17f958d2ee523a2206206994597c13d831ec7);
     address public frax;
     address public fxs;
     address public unirouter;
@@ -61,13 +64,7 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
     address public treasury;
     address public curve;
     address public uniV3Pool;
-    uint24 public fee;
-    int24 public tickLower;
-    int24 public tickUpper;
-    uint8 public curveIndexFrax;
-    uint8 public curveIndexWant;
-
-
+    address public oldStrategy;
 
     constructor(
         address _vault,
@@ -77,12 +74,8 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
         address _uniNFT,
         address _fraxLock,
         address _curve,
-        address _uniV3Pool,
-        uint24 _fee,
-        int24 _tickLower,
-        int24 _tickUpper,
-        uint8 _curveIndexFrax,
-        uint8 _curveIndexWant
+        address _uniV3Pool
+
     ) public BaseStrategyInitializable(_vault) {
         // Constructor should initialize local variables
         _initializeThis(
@@ -92,12 +85,7 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
             _uniNFT,
             _fraxLock,
             _curve,
-            _uniV3Pool,
-            _fee,
-            _tickLower,
-            _tickUpper,
-            _curveIndexFrax,
-            _curveIndexWant
+            _uniV3Pool
         );
     }
 
@@ -109,7 +97,7 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
         address _uniNFT,
         address _fraxLock,
         address _curve,
-        address _uniV3Pool,
+        address _uniV3Pool
     ) internal {
         require(
             address(frax) == address(0),
@@ -134,8 +122,12 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
         // TODO: Math.min(fraxLock.lock_time_min(), 86400);
         // ^^ The 86400 is a variable that can be set later on via set function. Would the above be able to be passed via function?
         // if so, easy fix.
-        fraxTimelockSet = 86400;
+        // changing default to 7 days
+        fraxTimelockSet = 604800;
         tokenId = 0;
+        // set to yearn treasury to init as failsafe
+        oldStrategy = address(0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52);
+
 
         // TODO: Iterate through curve pool to find indices of want and frax
         // ^^ passing them in as constructor
@@ -207,53 +199,6 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
         );
     }
 
-    // TODO: Move this to factory
-    function cloneFraxUni(
-        address _vault,
-        address _strategist,
-        address _rewards,
-        address _keeper,
-        address _frax,
-        address _fxs,
-        address _unirouter,
-        address _uniNFT,
-        address _fraxLock,
-        address _curve,
-        address _uniV3Pool
-    ) external returns (address newStrategy) {
-        // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
-        bytes20 addressBytes = bytes20(address(this));
-
-        assembly {
-        // EIP-1167 bytecode
-            let clone_code := mload(0x40)
-            mstore(
-            clone_code,
-            0x3d602d80600a3d3981f3363d3d373d3d3d363d73000000000000000000000000
-            )
-            mstore(add(clone_code, 0x14), addressBytes)
-            mstore(
-            add(clone_code, 0x28),
-            0x5af43d82803e903d91602b57fd5bf30000000000000000000000000000000000
-            )
-            newStrategy := create(0, clone_code, 0x37)
-        }
-
-        StrategyFraxUniswapDAI(newStrategy).initialize(
-            _vault,
-            _strategist,
-            _rewards,
-            _keeper,
-            _frax,
-            _fxs,
-            _unirouter,
-            _uniNFT,
-            _fraxLock,
-            _curve,
-            _uniV3Pool
-        );
-    }
-
     function name() external view override returns (string memory) {
         return
         string(
@@ -278,9 +223,12 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
     function onERC721Received(
         address,
         address,
-        uint256,
+        uint256 tokenIncoming,
         bytes calldata
     ) public pure virtual returns (bytes4) {
+        require(msg.sender == oldStrategy || msg.sender == fraxLock, "nonallowed NFT sender address");
+        tokenId = tokenIncoming;
+
         return this.onERC721Received.selector;
     }
 
@@ -385,16 +333,16 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
             // need to swap half want to frax
             uint256 halfWant = _wantAvailable.div(2);
             _curveSwap(halfWant, want, frax);
-            uint256 fraxBal = IERC20(frax).balanceOf(address(this));
-            uint256 wantBal = IERC20(want).balanceOf(address(this));
 
+            uint256 token0Balance = IERC20(IFrax(fraxLock).uni_token0()).balanceOf(address(this));
+            uint256 token1Balance = IERC20(IFrax(fraxLock).uni_token1()).balanceOf(address(this));
             uint256 stamp = block.timestamp;
             uint256 deadline = stamp.add(60 * 5);
 
             IUniNFT.increaseStruct memory setIncrease = IUniNFT.increaseStruct(
                 tokenId,
-                wantBal,
-                fraxBal,
+                token0Balance,
+                token1Balance,
                 0,
                 0,
                 deadline);
@@ -433,20 +381,19 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
 
     // withdraw some want from the vaults
     function _withdrawSome(uint256 _amount) internal returns (uint256) {
-        //uint256 curTimestamp = block.timestamp;
-        // will need to check if timelocked
-        //if(fraxTimelockRemaining > curTimestamp) {
-        //    return(0);
-        //}
 
         uint256 balanceOfWantBefore = balanceOfWant();
         uint256 valueOfFraxBefore = IERC20(frax).balanceOf(address(this));
 
         nftUnlock();
 
-        // TODO: I recommend writing more defensive code here to make sure fraction = range[0,1].
+        uint256 fraction;
         // _amount > balanceOfNFT() will result in unwanted results
-        uint256 fraction = (_amount).mul(1e18).div(balanceOfNFT());
+        if (_amount > balanceOfNFT()) {
+            fraction == 0;
+        } else {
+            fraction = (_amount).mul(1e18).div(balanceOfNFT());
+        }
 
         (,,,,,,,uint256 initLiquidity,,,,) = IUniNFT(uniNFT).positions(tokenId);
 
@@ -471,9 +418,6 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
         IUniNFT(uniNFT).decreaseLiquidity(setDecrease);
 
         // maximum value of uint128
-        // TODO: type(uint128).max
-        // ^^ that was breaking my tests for some reason - I might not have the right package installed? So I went the alt route
-        // not an underflow method, so it should be fine.
         uint128 MAX_INT = 2 ** 128 - 1;
 
         IUniNFT.collectStruct memory collectParams = IUniNFT.collectStruct(
@@ -484,7 +428,7 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
 
         IUniNFT(uniNFT).collect(collectParams);
 
-        _curveSwap(IERC20(frax).balanceOf(address(this), frax, want);
+        _curveSwap(IERC20(frax).balanceOf(address(this), frax, want));
         return balanceOfWant().sub(balanceOfWantBefore);
     }
 
@@ -503,7 +447,6 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
 
         nftUnlock();
 
-        // TODO: Read ERC721Received above for more info
         IERC721(uniNFT).transferFrom(
             address(this),
             _newStrategy,
@@ -526,8 +469,8 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
         // USDC=Tether=6, frax=dai=18,
 
         // Convert in terms of want. Assuming 1:1 stable:frax
-         uint decFrax = ERC20(frax).decimals();
-         uint decWant = ERC20(want).decimals();
+         uint decFrax = IERC20(frax).decimals();
+         uint decWant = IERC20(want).decimals();
             if(decFrax > decWant){
                 return fraxTrue.div(10 ** (decFrax.sub(decWant)));
             }else{
@@ -540,10 +483,11 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
 
         (uint160 sqrtPriceX96,,,,,,) = IUniV3Pool(uniV3Pool).slot0();
 
-        (uint256 amount0, uint256 amount1) = principal(sqrtPriceX96);
+        (uint256 amount0, uint256 amount1) = principal(uniNFT, tokenId, sqrtPriceX96);
 
         uint256 fraxTrue;
         // figure out which amount is for frax
+        address token0 = IFrax(fraxLock).uni_token0();
         if (token0 == frax) {
             fraxTrue = amount0;
         }else{
@@ -551,8 +495,8 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
         }
 
         // Convert in terms of want. Assuming 1:1 stable:frax
-        uint decFrax = ERC20(frax).decimals();
-        uint decWant = ERC20(want).decimals();
+        uint decFrax = IERC20(frax).decimals();
+        uint decWant = IERC20(want).decimals();
         uint256 fraxRebase;
         if(decFrax > decWant){
                 fraxRebase = fraxTrue.div(10 ** (decFrax.sub(decWant)));
@@ -588,23 +532,26 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
 
     function _curveSwap(uint256 _amountIn, address _tokenIn, address _tokenOut) internal {
         // USDC is 2, DAI is 1, Tether is 3, frax is 0
+
+            uint8 _indexIn;
+            uint8 _indexOut;
         if(_tokenIn == address(dai)) {
-            uint8 _indexIn = 1;
+            _indexIn = 1;
         } else if(_tokenIn == address(usdc)) {
-            uint8 _indexIn = 2;
+            _indexIn = 2;
         } else if(_tokenIn == address(tether)) {
-            uint8 _indexIn = 3;
+            _indexIn = 3;
         } else {
-            uint8 _indexIn = 0;
+            _indexIn = 0;
         }
         if(_tokenOut == address(dai)) {
-            uint8 _indexOut = 1;
+            _indexOut = 1;
         } else if(_tokenOut == address(usdc)) {
-            uint8 _indexOut = 2;
+            _indexOut = 2;
         } else if(_tokenOut == address(tether)) {
-            uint8 _indexOut = 3;
+            _indexOut = 3;
         } else {
-            uint8 _indexOut = 0;
+            _indexOut = 0;
         }
 
         ICurveFi(curve).exchange_underlying(_indexIn, _indexOut, _amountIn, 0);
@@ -619,7 +566,7 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
 
     // claims rewards if unlocked
     function _claimReward() internal {
-        if(IFrax(fraxLock).rewardsCollectionPaused() == True){
+        if(IFrax(fraxLock).rewardsCollectionPaused() == true){
             return;
         }
         if(IFrax(fraxLock).earned() > 0) {
@@ -633,7 +580,7 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
 
     // the amount of FXS to keep
     function setKeep(uint256 _percentKeepInBips) external onlyGovernance {
-        percentKeep = _percentKeep;
+        percentKeep = _percentKeepInBips;
     }
 
     // where FXS goes
@@ -642,20 +589,24 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
     }
 
     // sets time locked as a multiple of days.
-    // initial value is set to 1 day
+    // initial value is set to 7 day
     function setFraxTimelock(uint256 _days) external onlyVaultManagers {
         uint256 _secs = _days.mul(86400);
-        require(_secs >= fraxLock.lock_time_min, "time below minimum required");
+        require(_secs >= fraxLock.lock_time_min(), "time below minimum required");
+        require(_secs <= fraxLock.lock_time_for_max_multiplier(), "time exceeds maximum");
         fraxTimelockSet = _secs;
     }
 
     // Override just in case
-    function setTokenID(uint256 _id) external onlyVaultManager {
+    function setTokenID(uint256 _id) external onlyVaultManagers {
         tokenId = _id;
     }
 
-    // TODO: Instead needing to call this separately and manually, why not integrate this into adjustPosition?
-    // TODO: You can do something like if(tokenId = 0 && initBalance>0) mintNFT()
+    // to be set before calling migrate -
+    function setOldStrategy(address _oldStrategy) external onlyVaultManagers {
+        oldStrategy = _oldStrategy;
+    }
+
     // This function is needed to initialize the entire strategy.
     // This will run through the process of minting the NFT on UniV3
     // that NFT will be the NFT we use for this strat. We will add/sub balances, but never burn the NFT
@@ -669,12 +620,11 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
         // swap want to Frax
         _curveSwap(swapAmt, want, frax);
 
-        uint256 token0Balance = IERC20(uniNFT.token0()).balanceOf(address(this));
-        uint256 token1Balance = IERC20(uniNFT.token1()).balanceOf(address(this));
+        uint256 token0Balance = IERC20(IFrax(fraxLock).uni_token0()).balanceOf(address(this));
+        uint256 token1Balance = IERC20(IFrax(fraxLock).uni_token1()).balanceOf(address(this));
         uint256 timestamp = block.timestamp;
         uint256 deadline = timestamp.add(5 * 60);
 
-        // may want to make these settable
         // values for FRAX/Dai
         //uint24 fee = 500;
         //int24 tickLower = (-50);
@@ -684,16 +634,15 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
         //int24 tickLower = (-276380);
         //int24 tickUpper = (-276270);
 
-        // TODO: Abstract out the tick values to the function param or even better, pass it in at constructor level
         IUniNFT.nftStruct memory setNFT = IUniNFT.nftStruct(
-            uniNFT.token0(),
-            uniNFT.token1(),
+            IFrax(fraxLock).uni_token0(),
+            IFrax(fraxLock).uni_token1(),
             //500,
             //(- 50),
             //50,
-            fees,
-            lowerTick,
-            upperTick,
+            IFrax(fraxLock).uni_required_fee(),
+            IFrax(fraxLock).uni_tick_lower(),
+            IFrax(fraxLock).uni_tick_upper(),
             token0Balance,
             token1Balance,
             0,
@@ -709,27 +658,25 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
     }
 
     // Calculates principal via PositionValue lib
-    function principal(contract uniNFT, tokenId, uint160 sqrtRatioX96)
+    function principal(uniNFT, tokenId, uint160 sqrtRatioX96)
      internal view returns (uint256 amount0, uint256 amount1) {
 
         return PositionValue.principal(uniNFT, tokenId, sqrtRatioX96);
 
     }
 
-    // TODO: Suggestion if possible, add triggers for harvest and tend when it's free to unlock so that we don't accidentally forfeit the locking rewards
-    // ^^the unlock function here will fail if locked. Not needed.
+    // the unlock function here will fail if locked.
     // require(block.timestamp >= thisStake.ending_timestamp || stakesUnlocked == true, "Stake is still locked!")
     function nftUnlock() internal {
         // Require(withdrawalsPaused() == false), otherwise migration can happen without the nft transferred, essentially losing our entire position
-        require (IFrax(fraxLock).withdrawalsPaused() == false, "withdrawals paused")
+        require (IFrax(fraxLock).withdrawalsPaused() == false, "withdrawals paused");
         address nftOwner = IUniNFT(uniNFT).ownerOf(tokenId);
         if (nftOwner == address(fraxLock)) {
             IFrax(fraxLock).withdrawLocked(tokenId);
         }
     }
 
-    // TODO: I recommend just leaving this blank. Not worth to add unirouter just for an estimation, unless V2 has concentrated liquidity
-    // ^^ V2 has the most concentrated liq - so I added this specifically for the 0.4.3 upgrade
+    // V2 has the most concentrated liq - so I added this specifically for the 0.4.3 upgrade
     // below for 0.4.3 upgrade
     function ethToWant(uint256 _amtInWei)
     public
@@ -753,6 +700,7 @@ contract StrategyFraxUniswapDAI is BaseStrategyInitializable {
     returns (uint256 _amountFreed)
     {
         //shouldn't matter, logic is already in liquidatePosition
+        uint256 max256 = type(256).max;
         (_amountFreed,) = liquidatePosition(max256);
     }
 }
