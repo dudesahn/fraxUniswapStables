@@ -12,14 +12,22 @@ contract StrategyFactory {
 
     constructor(
         address _vault,
+        address _frax,
+        address _fxs,
+        address _unirouter,
         address _uniNFT,
         address _fraxLock,
+        address _curve,
         address _uniV3Pool
     ) public {
         Strategy _original = new Strategy(
             _vault,
+            _frax,
+            _fxs,
+            _unirouter,
             _uniNFT,
             _fraxLock,
+            _curve,
             _uniV3Pool);
         emit Deployed(address(_original));
 
@@ -43,6 +51,9 @@ contract StrategyFactory {
 
     function clone(
         address _vault,
+        address _strategist,
+        address _rewards,
+        address _keeper,
         address _frax,
         address _fxs,
         address _unirouter,
@@ -64,8 +75,15 @@ contract StrategyFactory {
 
         Strategy(newStrategy).initialize(
             _vault,
+            _strategist,
+            _rewards,
+            _keeper,
+            _frax,
+            _fxs,
+            _unirouter,
             _uniNFT,
             _fraxLock,
+            _curve,
             _uniV3Pool);
         emit Cloned(newStrategy);
     }

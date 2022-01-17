@@ -9,7 +9,9 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/math/Math.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "../../interfaces/openZeppelin/IERC20Metadata.sol";
+
 
 import {BaseStrategy} from "@yearn/contracts/BaseStrategy.sol";
 
@@ -215,20 +217,20 @@ contract Strategy is BaseStrategy {
     // Now, the above line could be easily tempered with by any small brain by sending a random nft to reset the tokenId
     // TODO: Make sure to only receive the nft if it's from old_strategy by require(msg.sender == old_strategy)
     // TODO: Add method setOldStrategy onlyVaultManager to act as a password
-
     // Responding to above: This is not just for migrations, this is needed for all unlock events
     // the tokenId shouldn't change from normal harvests - so I don't want to have the tokenId changed upon receiving an NFT
     // the old_strategy per above wouldn't work, as we'd also be receiving from the fraxLock contract.
     // As such, I think that the safest course of action is to continue with the manual onlyApproved function call to manually declare tokenID
     // that will be for the migration case, and will be the only time it's used.
+    // also: having to call setOldStrategy to act as password in order for the new upgraded strat to receive the NFT isn't much different than just setting the tokenId after migrating
     function onERC721Received(
         address,
         address,
         uint256 tokenIncoming,
         bytes calldata
     ) public pure virtual returns (bytes4) {
-        require(msg.sender == oldStrategy || msg.sender == fraxLock, "nonallowed NFT sender address");
-        tokenId = tokenIncoming;
+        //require(msg.sender == address(oldStrategy) || msg.sender == fraxLock, "nonallowed NFT sender address");
+        //tokenId = tokenIncoming;
 
         return this.onERC721Received.selector;
     }
@@ -275,7 +277,7 @@ contract Strategy is BaseStrategy {
 
         // harvest() will track profit by estimated total assets compared to debt.
         uint256 totalBalBefore = balanceOfWant().add(valueOfFrax());
-        uint256 debt = vault.strategies(address(this)).totalDebt;
+        //uint256 debt = vault.strategies(address(this)).totalDebt;
 
         _claimReward();
 
@@ -326,7 +328,7 @@ contract Strategy is BaseStrategy {
             return;
         }
 
-        uint256 sumBefore = valueOfFrax().add(_balanceOfWant);
+        //uint256 sumBefore = valueOfFrax().add(_balanceOfWant);
 
         // Invest the rest of the want
         uint256 _wantAvailable = _balanceOfWant.sub(_debtOutstanding);
@@ -384,7 +386,7 @@ contract Strategy is BaseStrategy {
     function _withdrawSome(uint256 _amount) internal returns (uint256) {
 
         uint256 balanceOfWantBefore = balanceOfWant();
-        uint256 valueOfFraxBefore = IERC20(frax).balanceOf(address(this));
+        //uint256 valueOfFraxBefore = IERC20(frax).balanceOf(address(this));
 
         nftUnlock();
 
