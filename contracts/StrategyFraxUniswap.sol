@@ -43,7 +43,7 @@ interface IName {
     Use BaseStrategy and factory pattern to clone.
     Example https://github.com/tonkers-kuma/strategy-88mph/blob/ftm-yswaps/contracts/StrategyFactory.sol
 */
-contract Strategy is BaseStrategy {
+contract StrategyFraxUniswap is BaseStrategy {
     using SafeERC20 for IERC20;
     using Address for address;
     using SafeMath for uint256;
@@ -54,66 +54,113 @@ contract Strategy is BaseStrategy {
     uint256 public constant _denominator = 10000;
     uint256 public percentKeep;
     uint256 public fraxTimelockSet;
-    uint256 public tokenId;
-    address public constant dai = address(0x6B175474E89094C44Da98b954EedeAC495271d0F);
-    address public constant usdc = address(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
-    address public constant tether = address(0xdAC17F958D2ee523a2206206994597C13D831ec7);
-    address public frax;
-    address public fxs;
-    address public unirouter;
-    address public uniNFT;
-    address public fraxLock;
     address public refer;
     address public treasury;
-    address public curve;
-    address public uniV3Pool;
     address public oldStrategy;
+    
+    // these are variables specific to our want-FRAX pair
+    uint256 public tokenId;
+    address internal constant fraxLock = 0xF22471AC2156B489CC4a59092c56713F813ff53e;
+    address internal constant uniV3Pool = 0x97e7d56A0408570bA1a7852De36350f7713906ec;
+    
+    // set up our constants
+    IERC20 internal constant dai = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
+    // IERC20 internal constant usdc = IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
+    
+    address internal constant unirouter = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
+    IERC20 internal constant frax = IERC20(0x853d955aCEf822Db058eb8505911ED77F175b99e);
+    address internal constant fxs = 0x3432B6A60D23Ca0dFCa7761B7ab56459D9C964D0;
+    address internal constant uniNFT = 0xC36442b4a4522E871399CD717aBDD847Ab11FE88;
+    address internal constant curve = 0xd632f22692FaC7611d2AA1C0D552930D43CAEd3B;
+
+    string internal stratName; // set our strategy name here
+    
+    // these are our decimals
+    uint256 internal decFrax = 18;
+    uint256 internal decWant = 18;
+    
+    // check for cloning
+    bool internal isOriginal = true;
+
+    /* ========== CONSTRUCTOR ========== */
 
     constructor(
         address _vault,
-        address _frax,
-        address _fxs,
-        address _unirouter,
-        address _uniNFT,
         address _fraxLock,
-        address _curve,
-        address _uniV3Pool
-
+        address _uniV3Pool,
+        string memory _name
     ) public BaseStrategy(_vault) {
         // Constructor should initialize local variables
         _initializeStrat(
-            _frax,
-            _fxs,
-            _unirouter,
-            _uniNFT,
             _fraxLock,
-            _curve,
-            _uniV3Pool
+            _uniV3Pool,
+            _name
         );
     }
 
-    // initializetime
-    function _initializeStrat(
-        address _frax,
-        address _fxs,
-        address _unirouter,
-        address _uniNFT,
+    /* ========== CLONING ========== */
+
+    event Cloned(address indexed clone);
+
+    // we use this to clone our original strategy to other vaults
+    function cloneSingleSideFrax(
+        address _vault,
+        address _strategist,
+        address _rewards,
+        address _keeper,
         address _fraxLock,
-        address _curve,
-        address _uniV3Pool
-    ) internal {
-        require(
-            address(frax) == address(0),
-            "StrategyFraxUniswap already initialized"
+        address _uniV3Pool,
+        string memory _name
+    ) external returns (address newStrategy) {
+        require(isOriginal);
+        // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
+        bytes20 addressBytes = bytes20(address(this));
+        assembly {
+            // EIP-1167 bytecode
+            let clone_code := mload(0x40)
+            mstore(
+                clone_code,
+                0x3d602d80600a3d3981f3363d3d373d3d3d363d73000000000000000000000000
+            )
+            mstore(add(clone_code, 0x14), addressBytes)
+            mstore(
+                add(clone_code, 0x28),
+                0x5af43d82803e903d91602b57fd5bf30000000000000000000000000000000000
+            )
+            newStrategy := create(0, clone_code, 0x37)
+        }
+
+        StrategyFraxUniswap(newStrategy).initialize(
+            _vault,
+            _strategist,
+            _rewards,
+            _keeper,
+            _fraxLock,
+            _uniV3Pool,
+            _name
         );
 
-        frax = _frax;
-        fxs = _fxs;
-        unirouter = _unirouter;
-        uniNFT = _uniNFT;
-        fraxLock = _fraxLock;
-        curve = _curve;
-        uniV3Pool = _uniV3Pool;
+        emit Cloned(newStrategy);
+    }
+
+    // this will only be called by the clone function above
+    function initialize(
+        address _vault,
+        address _strategist,
+        address _rewards,
+        address _keeper,
+        string memory _name
+    ) public {
+        _initialize(_vault, _strategist, _rewards, _keeper);
+        _initializeStrat(_name);
+    }
+
+    // this is called by our original strategy, as well as any clones
+    function _initializeStrat(
+        string memory _name
+    ) internal {
+        // make sure that we haven't initialized this before
+        require(tokenId == 0); // dev: already initialized.
         // TODO: Add some checks here to make sure lock/nft/vault/pool tokens all match up
 
         percentKeep = 1000;
@@ -127,87 +174,33 @@ contract Strategy is BaseStrategy {
         // if so, easy fix.
         // changing default to 7 days
         fraxTimelockSet = 604800;
-        tokenId = 0;
+        tokenId = 1;
         // set to yearn treasury to init as failsafe
         oldStrategy = address(0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52);
 
 
         // TODO: Iterate through curve pool to find indices of want and frax
         // ^^ passing them in as constructor
-
-
+        
+        // mint tthe NFT in here too, duh
+        
         // setting maxVar
         uint256 max256 = 2 ** 256 - 1;
-        IERC20(want).safeApprove(curve, max256);
-        IERC20(frax).safeApprove(curve, max256);
-        IERC20(want).safeApprove(uniNFT, max256);
-        IERC20(frax).safeApprove(uniNFT, max256);
-        IERC20(fxs).safeApprove(unirouter, max256);
+        IERC20(want).safeApprove(curve, type(uint256).max);
+        IERC20(frax).safeApprove(curve, type(uint256).max);
+        IERC20(want).safeApprove(uniNFT, type(uint256).max);
+        IERC20(frax).safeApprove(uniNFT, type(uint256).max);
+        IERC20(fxs).safeApprove(unirouter, type(uint256).max);
         IERC721(uniNFT).setApprovalForAll(governance(), true);
         IERC721(uniNFT).setApprovalForAll(strategist, true);
         IERC721(uniNFT).setApprovalForAll(fraxLock, true);
-    }
 
-    function _initialize(
-        address _vault,
-        address _strategist,
-        address _rewards,
-        address _keeper,
-        address _frax,
-        address _fxs,
-        address _unirouter,
-        address _uniNFT,
-        address _fraxLock,
-        address _curve,
-        address _univ3Pool
-    ) internal {
-        // Parent initialize contains the double initialize check
-        super._initialize(_vault, _strategist, _rewards, _keeper);
-        _initializeStrat(
-            _frax,
-            _fxs,
-            _unirouter,
-            _uniNFT,
-            _fraxLock,
-            _curve,
-            _univ3Pool
-        );
-    }
-
-    function initialize(
-        address _vault,
-        address _strategist,
-        address _rewards,
-        address _keeper,
-        address _frax,
-        address _fxs,
-        address _unirouter,
-        address _uniNFT,
-        address _fraxLock,
-        address _curve,
-        address _uniV3Pool
-    ) external {
-        _initialize(
-            _vault,
-            _strategist,
-            _rewards,
-            _keeper,
-            _frax,
-            _fxs,
-            _unirouter,
-            _uniNFT,
-            _fraxLock,
-            _curve,
-            _uniV3Pool
-        );
+        // set our strategy's name
+        stratName = _name;
     }
 
     function name() external view override returns (string memory) {
-        return
-        string(
-        // use symbol()
-            abi.encodePacked("FRAX_Uniswap ", IName(address(want)).name())
-        );
+        return stratName;
     }
 
 
@@ -240,15 +233,7 @@ contract Strategy is BaseStrategy {
     view
     override
     returns (address[] memory)
-    {
-        address[] memory protected = new address[](3);
-        // (aka want) is already protected by default
-        protected[0] = frax;
-        protected[1] = fxs;
-        protected[2] = uniNFT;
-
-        return protected;
-    }
+    {}
 
 
     // returns sum of all assets, realized and unrealized
@@ -337,10 +322,8 @@ contract Strategy is BaseStrategy {
             uint256 halfWant = _wantAvailable.div(2);
             _curveSwap(halfWant, address(want), address(frax));
 
-            uint256 token0Balance = IERC20(IFrax(fraxLock).uni_token0()).balanceOf(address(this));
-            uint256 token1Balance = IERC20(IFrax(fraxLock).uni_token1()).balanceOf(address(this));
-            uint256 stamp = block.timestamp;
-            uint256 deadline = stamp.add(60 * 5);
+            uint256 token0Balance = dai.balanceOf(address(this));
+            uint256 token1Balance = frax.balanceOf(address(this));
 
             IUniNFT.increaseStruct memory setIncrease = IUniNFT.increaseStruct(
                 tokenId,
@@ -348,7 +331,7 @@ contract Strategy is BaseStrategy {
                 token1Balance,
                 0,
                 0,
-                deadline);
+                block.timestamp);
 
             // time to add val to NFT
             IUniNFT(uniNFT).increaseLiquidity(setIncrease);
@@ -465,20 +448,9 @@ contract Strategy is BaseStrategy {
     // TODO: Optional: Add public function balanceOfFrax() for frax.balanceOf(address(this)) replace use of IERC(token).balanceOf(address(this))
     // TODO: Optional: Add public function balanceOfReward() for fxs.balanceOf(address(this)) replace use of IERC(token).balanceOf(address(this))
 
-    // returns balance of frax, denominated in same dec as want
+    // returns balance of frax, denominated in same decimals as want
     function valueOfFrax() public view returns (uint256) {
-        uint256 fraxTrue = IERC20(frax).balanceOf(address(this));
-        //hard-coding for testing
-        // USDC=Tether=6, frax=dai=18,
-
-        // Convert in terms of want. Assuming 1:1 stable:frax
-         uint decFrax = IERC20Metadata(frax).decimals();
-         uint decWant = IERC20Metadata(address(want)).decimals();
-            if(decFrax > decWant){
-                return fraxTrue.div(10 ** (decFrax.sub(decWant)));
-            }else{
-                return fraxTrue.mul(10 ** (decWant.sub(decFrax)));
-            }
+        return IERC20(frax).balanceOf(address(this));
     }
 
     // returns balance of NFT
@@ -488,30 +460,7 @@ contract Strategy is BaseStrategy {
 
         (uint256 amount0, uint256 amount1) = principal(uniNFT, tokenId, sqrtPriceX96);
 
-        uint256 fraxTrue;
-        // figure out which amount is for frax
-        address token0 = IFrax(fraxLock).uni_token0();
-        if (token0 == frax) {
-            fraxTrue = amount0;
-        }else{
-            fraxTrue = amount1;
-        }
-
-        // Convert in terms of want. Assuming 1:1 stable:frax
-        uint decFrax = IERC20Metadata(frax).decimals();
-        uint decWant = IERC20Metadata(address(want)).decimals();
-        uint256 fraxRebase;
-        if(decFrax > decWant){
-                fraxRebase = fraxTrue.div(10 ** (decFrax.sub(decWant)));
-            }else{
-                fraxRebase = fraxTrue.mul(10 ** (decWant.sub(decFrax)));
-        }
-
-        if (token0 == frax) {
-            return fraxRebase.add(amount1);
-        }else{
-            return fraxRebase.add(amount0);
-        }
+        return amount1.mul(2);
     }
 
     // swaps rewarded tokens for want
@@ -540,19 +489,11 @@ contract Strategy is BaseStrategy {
             uint8 _indexOut;
         if(_tokenIn == address(dai)) {
             _indexIn = 1;
-        } else if(_tokenIn == address(usdc)) {
-            _indexIn = 2;
-        } else if(_tokenIn == address(tether)) {
-            _indexIn = 3;
         } else {
             _indexIn = 0;
         }
         if(_tokenOut == address(dai)) {
             _indexOut = 1;
-        } else if(_tokenOut == address(usdc)) {
-            _indexOut = 2;
-        } else if(_tokenOut == address(tether)) {
-            _indexOut = 3;
         } else {
             _indexOut = 0;
         }
@@ -562,10 +503,10 @@ contract Strategy is BaseStrategy {
 
     // to use in case the frax:want ratio slips significantly away from 1:1
     /// @notice DAI is 1, USDC is 2, Tether is 3, frax is 0
-    function curveSwap(uint256 _amountIn, uint8 _indexIn, uint8 _indexOut) external onlyVaultManagers {
-        /// @notice DAI is 1, USDC is 2, Tether is 3, frax is 0
-        ICurveFi(curve).exchange_underlying(_indexIn, _indexOut, _amountIn, 0);
-    }
+//     function curveSwap(uint256 _amountIn, uint8 _indexIn, uint8 _indexOut) external onlyVaultManagers {
+//         /// @notice DAI is 1, USDC is 2, Tether is 3, frax is 0
+//         ICurveFi(curve).exchange_underlying(_indexIn, _indexOut, _amountIn, 0);
+//     }
 
     // claims rewards if unlocked
     function _claimReward() internal {
@@ -615,7 +556,7 @@ contract Strategy is BaseStrategy {
     // that NFT will be the NFT we use for this strat. We will add/sub balances, but never burn the NFT
     // it will always have dust, accordingly
     function _mintNFT() internal {
-        require(tokenId == 0, "NFT already minted");
+        require(tokenId == 1, "NFT already minted");
         uint256 initBalance = IERC20(want).balanceOf(address(this));
         require(initBalance >0, "no value to mint");
 
@@ -686,16 +627,7 @@ contract Strategy is BaseStrategy {
     view
     override
     returns (uint256)
-    {
-        address[] memory path = new address[](2);
-        path[0] = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-        // weth
-        path[1] = address(want);
-
-        uint256[] memory amounts = IUni(unirouter).getAmountsOut(_amtInWei, path);
-
-        return amounts[amounts.length - 1];
-    }
+    {}
 
     function liquidateAllPositions()
     internal
