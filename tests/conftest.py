@@ -94,13 +94,6 @@ def strategy(
     strategy = guardian.deploy(
         StrategyFraxUniswapUSDC,
         vault,
-        frax,
-        fxs,
-        uni,
-        uniNFT,
-        fraxLock,
-        curve,
-        uniV3Pool,
     )
     strategy.setKeeper(keeper)
     vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
@@ -156,13 +149,6 @@ def newstrategy(
     newstrategy = guardian.deploy(
         StrategyFraxUniswapUSDC,
         vault,
-        frax,
-        fxs,
-        uni,
-        uniNFT,
-        fraxLock,
-        curve,
-        uniV3Pool,
     )
     newstrategy.setKeeper(keeper)
     yield newstrategy
