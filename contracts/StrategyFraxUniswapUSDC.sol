@@ -43,7 +43,7 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
     /* ========== STATE VARIABLES ========== */
 
     // variables for determining how much governance token to hold for voting rights
-    uint256 public constant _denominator = 10000;
+    uint256 public constant DENOMINATOR = 10000;
     uint256 public percentKeep;
     uint256 public fraxTimelockSet;
     address public refer;
@@ -53,9 +53,9 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
     // these are variables specific to our want-FRAX pair
     uint256 public tokenId;
     address internal constant fraxLock =
-        0xF22471AC2156B489CC4a59092c56713F813ff53e;
+        0x3EF26504dbc8Dd7B7aa3E97Bc9f3813a9FC0B4B0;
     address internal constant uniV3Pool =
-        0x97e7d56A0408570bA1a7852De36350f7713906ec;
+        0xc63B0708E2F7e69CB8A1df0e1389A98C35A76D52;
 
     // set up our constants
     IERC20 internal constant frax =
@@ -72,6 +72,8 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
     // these are our decimals
     uint256 internal constant decFrax = 18;
     uint256 internal constant conversionFactor = 1e12; // used to convert frax to USDC
+
+    bool public reLockProfits; // true if we choose to re-lock profits following each harvest
 
     // check for cloning
     bool internal isOriginal = true;
@@ -95,11 +97,11 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         fraxTimelockSet = 86400;
         tokenId = 1;
 
-        want.safeApprove(curve, type(uint256).max);
-        frax.safeApprove(curve, type(uint256).max);
-        want.safeApprove(uniNFT, type(uint256).max);
-        frax.safeApprove(uniNFT, type(uint256).max);
-        fxs.safeApprove(unirouter, type(uint256).max);
+        want.approve(curve, type(uint256).max);
+        frax.approve(curve, type(uint256).max);
+        want.approve(uniNFT, type(uint256).max);
+        frax.approve(uniNFT, type(uint256).max);
+        fxs.approve(unirouter, type(uint256).max);
         IERC721(uniNFT).setApprovalForAll(governance(), true);
         IERC721(uniNFT).setApprovalForAll(strategist, true);
         IERC721(uniNFT).setApprovalForAll(fraxLock, true);
@@ -170,7 +172,16 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         return fraxTrue.div(conversionFactor);
     }
 
-    // returns balance of NFT - cannot calculate on-chain so this is a running value
+    function nftIsLocked() public view returns (bool) {
+        uint256 lockedAmount = IFrax(fraxLock).lockedLiquidityOf(address(this));
+        if (lockedAmount > 0) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    // returns balance of our UniV3 LP, assuming 1 FRAX = 1 want
     function balanceOfNFT() public view returns (uint256) {
         (uint160 sqrtPriceX96, , , , , , ) = IUniV3Pool(uniV3Pool).slot0();
 
@@ -198,7 +209,7 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
     {}
 
     // returns sum of all assets, realized and unrealized
-    // assume frax == want in value to avoid oracle failures
+    // assume frax == want in value to avoid oracle failures (is this actually a good idea? should we instead price it based on actual pool?)
     function estimatedTotalAssets() public view override returns (uint256) {
         return balanceOfWant().add(balanceOfFrax()).add(balanceOfNFT());
     }
@@ -213,11 +224,9 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
             uint256 _debtPayment
         )
     {
-        // We might need to return want to the vault
+        // only allow withdrawals from loose want to avoid getting rekt by flashbots
         if (_debtOutstanding > 0) {
-            uint256 _amountFreed = 0;
-            (_amountFreed, _loss) = liquidatePosition(_debtOutstanding);
-            _debtPayment = Math.min(_amountFreed, _debtOutstanding);
+            _debtPayment = Math.min(_debtOutstanding, balanceOfWant());
         }
 
         // harvest() will track profit by estimated total assets compared to debt.
@@ -226,17 +235,18 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
 
         uint256 currentValue = estimatedTotalAssets();
 
+        // claim our rewards
         claimReward();
 
-        uint256 _tokensAvailable = IERC20(fxs).balanceOf(address(this));
-        if (_tokensAvailable > 0) {
-            uint256 _tokensToGov =
-                _tokensAvailable.mul(percentKeep).div(_denominator);
-            if (_tokensToGov > 0) {
-                IERC20(fxs).safeTransfer(treasury, _tokensToGov);
+        uint256 tokensAvailable = fxs.balanceOf(address(this));
+        if (tokensAvailable > 0) {
+            uint256 tokensToGov =
+                tokensAvailable.mul(percentKeep).div(DENOMINATOR);
+            if (tokensToGov > 0) {
+                fxs.safeTransfer(treasury, tokensToGov);
             }
-            uint256 _tokensRemain = IERC20(fxs).balanceOf(address(this));
-            _swap(_tokensRemain, address(fxs));
+            uint256 tokensRemain = fxs.balanceOf(address(this));
+            _swap(tokensRemain);
         }
 
         uint256 balanceOfWantAfter = balanceOfWant();
@@ -266,66 +276,66 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
 
         uint256 sumBefore = balanceOfFrax().add(balanceOfWant());
 
-        // Invest the rest of the want
-        uint256 _wantAvailable = _balanceOfWant.sub(_debtOutstanding);
-        if (_wantAvailable > 0) {
-            // need to swap half want to frax
-            uint256 halfWant = _wantAvailable.mul(1e6).div(2e6);
-            _curveSwapToFrax(halfWant);
-            uint256 fraxBal = IERC20(frax).balanceOf(address(this));
-            uint256 wantBal = IERC20(want).balanceOf(address(this));
+        // ADD A BREAKER IF STATEMENT HERE TO PREVENT RE-LOCKING IF WE DON'T WANT IT DURING HARVESTS
+        if (reLockProfits) {
+            // Invest the rest of the want
+            uint256 _wantAvailable = _balanceOfWant.sub(_debtOutstanding);
+            if (_wantAvailable > 0) {
+                // need to swap half want to frax, but use the proper conversion
+                (uint160 sqrtPriceX96, , , , , , ) =
+                    IUniV3Pool(uniV3Pool).slot0();
+                (uint256 amount0, uint256 amount1) = principal(sqrtPriceX96);
+                uint256 ratio =
+                    amount0.div(conversionFactor).mul(1e6).div(amount1);
+                uint256 fraxNeeded =
+                    _wantAvailable.mul(ratio).div(ratio.add(1e6));
 
-            uint256 stamp = block.timestamp;
-            uint256 deadline = stamp.add(60 * 5);
+                _curveSwapToFrax(fraxNeeded);
+                uint256 fraxBal = frax.balanceOf(address(this));
+                uint256 wantBal = want.balanceOf(address(this));
 
-            IUniNFT.increaseStruct memory setIncrease =
-                IUniNFT.increaseStruct(
-                    tokenId,
-                    fraxBal,
-                    wantBal,
-                    0,
-                    0,
-                    deadline
-                );
+                IUniNFT.increaseStruct memory setIncrease =
+                    IUniNFT.increaseStruct(
+                        tokenId,
+                        fraxBal,
+                        wantBal,
+                        0,
+                        0,
+                        block.timestamp
+                    );
 
-            // time to add val to NFT
-            IUniNFT(uniNFT).increaseLiquidity(setIncrease);
-
-            uint256 sumAfter = balanceOfFrax().add(balanceOfWant());
-
-            uint256 addedValue = sumBefore.sub(sumAfter);
-
-            uint256 NFTAdded = balanceOfNFT().add(addedValue);
-
-            IERC721(uniNFT).approve(fraxLock, tokenId);
-
-            IFrax(fraxLock).stakeLocked(tokenId, fraxTimelockSet);
+                // add more liquidity to our NFT and stake it for rewards
+                IUniNFT(uniNFT).increaseLiquidity(setIncrease);
+                IFrax(fraxLock).stakeLocked(tokenId, fraxTimelockSet);
+            }
         }
     }
 
-    //v0.4.3 includes logic for emergencyExit
     function liquidatePosition(uint256 _amountNeeded)
         internal
         override
         returns (uint256 _liquidatedAmount, uint256 _loss)
     {
+        // check if we have enough free funds to cover the withdrawal
         uint256 _balanceOfWant = balanceOfWant();
         if (_balanceOfWant < _amountNeeded) {
             // We need to withdraw to get back more want
             _withdrawSome(_amountNeeded.sub(_balanceOfWant));
-            // reload balance of want after side effect
+            // reload balance of want after withdrawing funds
             _balanceOfWant = balanceOfWant();
         }
 
+        // check again if we have enough balance available to cover the liquidation
         if (_balanceOfWant >= _amountNeeded) {
             _liquidatedAmount = _amountNeeded;
         } else {
+            // we took a loss :(
             _liquidatedAmount = _balanceOfWant;
             _loss = _amountNeeded.sub(_balanceOfWant);
         }
     }
 
-    // withdraw some want from the vaults
+    // withdraw some want from the vaults, probably don't want to allow users to initiate this
     function _withdrawSome(uint256 _amount) internal returns (uint256) {
         //uint256 curTimestamp = block.timestamp;
         // will need to check if timelocked
@@ -397,9 +407,9 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
 
     // swaps rewarded tokens for want
     // uses UniV2. May want to include Sushi / UniV3
-    function _swap(uint256 _amountIn, address _token) internal {
+    function _swap(uint256 _amountIn) internal {
         address[] memory path = new address[](3);
-        path[0] = _token; // token to swap
+        path[0] = address(fxs); // fxs
         path[1] = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2); // weth
         path[2] = address(want);
 
@@ -408,7 +418,7 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
             0,
             path,
             address(this),
-            now
+            block.timestamp
         );
     }
 
@@ -489,7 +499,7 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
     // This will run through the process of minting the NFT on UniV3
     // that NFT will be the NFT we use for this strat. We will add/sub balances, but never burn the NFT
     // it will always have dust, accordingly
-    function mintNFT() external onlyGovernance {
+    function mintNFT() external {
         uint256 initBalance = IERC20(want).balanceOf(address(this));
 
         if (initBalance == 0) {
@@ -499,11 +509,8 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         //div(2) with extra decimal accuracy
         uint256 swapAmt = initBalance.mul(1e5).div(2e5);
         _curveSwapToFrax(swapAmt);
-        uint256 fraxBalance = IERC20(frax).balanceOf(address(this));
-        uint256 wantBalance = IERC20(want).balanceOf(address(this));
-
-        uint256 timestamp = block.timestamp;
-        uint256 deadline = timestamp.add(5 * 60);
+        uint256 fraxBalance = frax.balanceOf(address(this));
+        uint256 wantBalance = want.balanceOf(address(this));
 
         // may want to make these settable
         // values for FRAX/USDC
@@ -523,13 +530,16 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
                 0,
                 0,
                 address(this),
-                deadline
+                block.timestamp
             );
 
         //time to mint the NFT
         (uint256 tokenOut, , , ) = IUniNFT(uniNFT).mint(setNFT);
 
         tokenId = tokenOut;
+
+        // approve our NFT on our frax lock contract
+        IERC721(uniNFT).approve(fraxLock, tokenId);
     }
 
     /// turning PositionValue.sol into an internal function
@@ -577,14 +587,7 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         override
         returns (uint256)
     {
-        address[] memory path = new address[](2);
-        path[0] = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2); // weth
-        path[1] = address(want);
-
-        uint256[] memory amounts =
-            IUni(unirouter).getAmountsOut(_amtInWei, path);
-
-        return amounts[amounts.length - 1];
+        return _amtInWei;
     }
 
     function liquidateAllPositions()
