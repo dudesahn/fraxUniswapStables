@@ -3,6 +3,7 @@ import brownie
 from brownie import Contract
 from brownie import config
 
+
 def test_emergency_exit(
     gov,
     token,

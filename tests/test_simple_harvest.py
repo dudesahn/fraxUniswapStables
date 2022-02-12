@@ -23,25 +23,33 @@ def test_simple_harvest(
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     newWhale = token.balanceOf(whale)
-    
+
     assert strategy.nftIsLocked() == False
 
     # harvest, store asset amount
     chain.sleep(1)
     chain.mine(1)
-    print("Here's how much is in our NFT:", strategy.balanceOfNFT()/(10 ** token.decimals()))
+    print(
+        "Here's how much is in our NFT:",
+        strategy.balanceOfNFT() / (10 ** token.decimals()),
+    )
     strategy.harvest({"from": gov})
-    chain.sleep(1) # we currently lock for a day
+    chain.sleep(1)  # we currently lock for a day
     chain.mine(1)
     assert strategy.nftIsLocked() == True
-    print("Here's how much is in our NFT:", strategy.balanceOfNFT()/(10 ** token.decimals()))
+    print(
+        "Here's how much is in our NFT:",
+        strategy.balanceOfNFT() / (10 ** token.decimals()),
+    )
     old_assets = vault.totalAssets()
     print("Vault assets", old_assets / (10 ** token.decimals()))
     print("USDC strat", token.balanceOf(strategy) / (10 ** token.decimals()))
     print("FRAX strat", frax.balanceOf(strategy) / 1e18)
-    print("Strategy estimated assets", strategy.estimatedTotalAssets() / (10 ** token.decimals()))
-    
-    
+    print(
+        "Strategy estimated assets",
+        strategy.estimatedTotalAssets() / (10 ** token.decimals()),
+    )
+
     assert old_assets > 0
     assert strategy.estimatedTotalAssets() > 0
     print("\nStarting vault total assets: ", old_assets / (10 ** token.decimals()))
@@ -61,7 +69,9 @@ def test_simple_harvest(
         assert math.isclose(new_assets, old_assets, abs_tol=10)
     else:
         assert new_assets >= old_assets
-    print("\nVault total assets after 1 harvest: ", new_assets / (10 ** token.decimals()))
+    print(
+        "\nVault total assets after 1 harvest: ", new_assets / (10 ** token.decimals())
+    )
 
     # Display estimated APR
     print(
@@ -76,5 +86,7 @@ def test_simple_harvest(
     chain.sleep(86400)
 
     # withdraw and confirm our whale made money, or that we didn't lose more than dust
+
+
 #     vault.withdraw({"from": whale})
 #     assert token.balanceOf(whale) >= startingWhale

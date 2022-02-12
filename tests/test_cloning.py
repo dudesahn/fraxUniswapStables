@@ -2,6 +2,7 @@ import brownie
 from brownie import Wei, accounts, Contract, config
 import math
 
+
 def test_cloning(
     gov,
     token,

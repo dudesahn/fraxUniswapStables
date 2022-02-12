@@ -3,6 +3,7 @@ from brownie import Contract
 from brownie import config
 import math
 
+
 def test_change_debt(
     gov,
     token,

@@ -166,11 +166,11 @@ def strategy(
     vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 1_000, {"from": gov})
     strategy.setHealthCheck(healthCheck, {"from": gov})
     strategy.setDoHealthCheck(True, {"from": gov})
-    
+
     # setup our NFT
     token.transfer(strategy, 100e6, {"from": whale})
     strategy.mintNFT({"from": gov})
-    
+
     yield strategy
 
 

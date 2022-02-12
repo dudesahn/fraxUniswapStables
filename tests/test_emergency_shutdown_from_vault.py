@@ -3,6 +3,7 @@ from brownie import Contract
 from brownie import config
 import math
 
+
 def test_emergency_shutdown_from_vault(
     gov,
     token,

@@ -2,6 +2,7 @@ import brownie
 from brownie import chain
 import math
 
+
 def test_change_debt_with_profit(
     gov,
     token,
