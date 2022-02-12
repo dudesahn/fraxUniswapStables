@@ -68,6 +68,8 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         0xC36442b4a4522E871399CD717aBDD847Ab11FE88;
     ICurveFi internal constant curve =
         ICurveFi(0xd632f22692FaC7611d2AA1C0D552930D43CAEd3B);
+    address internal constant uniswapv3 =
+        0xE592427A0AEce92De3Edee1F18E0157C05861564;
 
     // these are our decimals
     uint256 internal constant decFrax = 18;
@@ -328,37 +330,26 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
 
         nftUnlock();
 
-        uint256 _balanceOfWant = balanceOfWant();
-
-        // do not invest if we have more debt than want
-        if (_debtOutstanding > _balanceOfWant) {
-            return;
-        }
-
-        uint256 sumBefore = valueOfFrax().add(balanceOfWant());
-
         // only re-lock our profits if our bool is true
         if (reLockProfits) {
             // Invest the rest of the want
-            uint256 _wantAvailable = _balanceOfWant.sub(_debtOutstanding);
-            if (_wantAvailable > 0) {
+            uint256 wantbal = balanceOfWant();
+            if (wantbal > 0) {
                 // need to swap half want to frax, but use the proper conversion
                 (uint160 sqrtPriceX96, , , , , , ) = IUniV3(uniV3Pool).slot0();
                 (uint256 amount0, uint256 amount1) = principal(sqrtPriceX96);
                 uint256 ratio =
                     amount0.div(conversionFactor).mul(1e6).div(amount1);
-                uint256 fraxNeeded =
-                    _wantAvailable.mul(ratio).div(ratio.add(1e6));
+                uint256 fraxNeeded = wantbal.mul(ratio).div(ratio.add(1e6));
 
                 _curveSwapToFrax(fraxNeeded);
                 uint256 fraxBal = frax.balanceOf(address(this));
-                uint256 wantBal = want.balanceOf(address(this));
 
                 IUniNFT.increaseStruct memory setIncrease =
                     IUniNFT.increaseStruct(
                         tokenId,
                         fraxBal,
-                        wantBal,
+                        balanceOfWant(),
                         0,
                         0,
                         block.timestamp
@@ -379,20 +370,20 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         returns (uint256 _liquidatedAmount, uint256 _loss)
     {
         // check if we have enough free funds to cover the withdrawal
-        uint256 balanceOfWant = balanceOfWant();
-        if (balanceOfWant < _amountNeeded) {
+        uint256 wantBal = balanceOfWant();
+        if (wantBal < _amountNeeded) {
             // We need to withdraw to get back more want
-            _withdrawSome(_amountNeeded.sub(balanceOfWant));
+            _withdrawSome(_amountNeeded.sub(wantBal));
             // reload balance of want after withdrawing funds
-            balanceOfWant = balanceOfWant();
+            wantBal = balanceOfWant();
         }
         // check again if we have enough balance available to cover the liquidation
-        if (balanceOfWant >= _amountNeeded) {
+        if (wantBal >= _amountNeeded) {
             _liquidatedAmount = _amountNeeded;
         } else {
             // we took a loss :(
-            _liquidatedAmount = balanceOfWant;
-            _loss = _amountNeeded.sub(balanceOfWant);
+            _liquidatedAmount = wantBal;
+            _loss = _amountNeeded.sub(wantBal);
         }
     }
 
@@ -405,11 +396,11 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         //}
 
         uint256 balanceOfWantBefore = balanceOfWant();
-        uint256 balanceOfFraxBefore = IERC20(frax).balanceOf(address(this));
+        uint256 balanceOfFraxBefore = frax.balanceOf(address(this));
 
         // check how much we would get out by just selling our FRAX profit, add this here first
 
-        require(harvestNow); // this way we only pull from the NFT during a harvest or manually
+        // require(harvestNow); // this way we only pull from the NFT during a harvest or manually
         nftUnlock();
 
         // use our "real" amount for this so we over-estimate
@@ -447,8 +438,7 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
 
         IUniNFT(uniNFT).collect(collectParams);
 
-        uint256 fraxBalance = IERC20(frax).balanceOf(address(this));
-        uint256 wantBalance = IERC20(want).balanceOf(address(this));
+        uint256 fraxBalance = frax.balanceOf(address(this));
 
         _curveSwapToWant(fraxBalance);
 
@@ -486,11 +476,7 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         uint256 _wethBalance = IERC20(weth).balanceOf(address(this));
         IUniV3(uniswapv3).exactInput(
             IUniV3.ExactInputParams(
-                abi.encodePacked(
-                    address(weth),
-                    uint24(uniStableFee),
-                    address(want)
-                ),
+                abi.encodePacked(weth, uint24(uniStableFee), address(want)),
                 address(this),
                 block.timestamp,
                 _wethBalance,
@@ -513,38 +499,34 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         curve.exchange_underlying(0, 2, _amountIn, 0);
     }
 
-    // to use in case the frax:want ratio slips significantly away from 1:1
-    function _externalSwapToFrax(uint256 _amountIn) external onlyGovernance {
-        // sets a slippage tolerance of 0.5%
-        uint256 _amountOut = _amountIn.mul(9950).div(10000);
-        // USDC is 2, DAI is 1, Tether is 3, frax is 0
-        curve.exchange_underlying(2, 0, _amountIn, _amountOut);
-    }
-
-    function _externalSwapToWant(uint256 _amountIn) external onlyGovernance {
-        // sets a slippage tolerance of 0.5%
-        uint256 _amountOut = _amountIn.mul(9950).div(10000);
-        // USDC is 2, DAI is 1, Tether is 3, frax is 0
-        curve.exchange_underlying(0, 2, _amountIn, _amountOut);
-    }
+    //     // to use in case the frax:want ratio slips significantly away from 1:1
+    //     function _externalSwapToFrax(uint256 _amountIn) external onlyGovernance {
+    //         // sets a slippage tolerance of 0.5%
+    //         uint256 _amountOut = _amountIn.mul(9950).div(10000);
+    //         // USDC is 2, DAI is 1, Tether is 3, frax is 0
+    //         curve.exchange_underlying(2, 0, _amountIn, _amountOut);
+    //     }
+    //
+    //     function _externalSwapToWant(uint256 _amountIn) external onlyGovernance {
+    //         // sets a slippage tolerance of 0.5%
+    //         uint256 _amountOut = _amountIn.mul(9950).div(10000);
+    //         // USDC is 2, DAI is 1, Tether is 3, frax is 0
+    //         curve.exchange_underlying(0, 2, _amountIn, _amountOut);
+    //     }
 
     // claims rewards if unlocked
     function claimReward() internal {
         IFrax(fraxLock).getReward();
     }
 
-    function setReferrer(address _refer) external onlyGovernance {
+    function setGovParams(
+        address _refer,
+        address _voter,
+        uint256 _keepFXS
+    ) external onlyGovernance {
         refer = _refer;
-    }
-
-    // the amount of FXS to keep
-    function setKeepFXS(uint256 _keepFXS) external onlyGovernance {
-        keepFXS = _keepFXS;
-    }
-
-    // where FXS goes
-    function setVoter(address _voter) external onlyGovernance {
         voter = _voter;
+        keepFXS = _keepFXS;
     }
 
     // sets time locked as a multiple of days. Would recommend values between 1-7.
@@ -587,7 +569,6 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         uint256 swapAmt = initBalance.mul(1e5).div(2e5);
         _curveSwapToFrax(swapAmt);
         uint256 fraxBalance = frax.balanceOf(address(this));
-        uint256 wantBalance = want.balanceOf(address(this));
 
         // may want to make these settable
         // values for FRAX/USDC
@@ -603,7 +584,7 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
                 (-276380),
                 (-276270),
                 fraxBalance,
-                wantBalance,
+                balanceOfWant(),
                 0,
                 0,
                 address(this),
