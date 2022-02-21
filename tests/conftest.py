@@ -169,7 +169,7 @@ def strategy(
 
     # setup our NFT
     token.transfer(strategy, 100e6, {"from": whale})
-    strategy.mintNFT({"from": gov})
+    strategy.mintNFT({"from": gov})    
 
     yield strategy
 
