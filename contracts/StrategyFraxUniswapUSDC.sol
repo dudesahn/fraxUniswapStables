@@ -348,7 +348,7 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
             _amountIn.mul(DENOMINATOR.sub(slippageMax)).div(DENOMINATOR);
 
         // USDC is 2, DAI is 1, Tether is 3, frax is 0
-        curve.exchange_underlying(2, 0, _amountIn, _amountOut);
+        curve.exchange_underlying(2, 0, _amountIn, 0);
     }
 
     function _curveSwapToWant(uint256 _amountIn) internal {
@@ -367,7 +367,7 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         }
 
         // unlock our NFT so we can withdraw or deposit more as needed
-        nftUnlock();
+        _nftUnlock();
 
         // only re-lock our profits if our bool is true
         if (reLockProfits) {
@@ -466,46 +466,51 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         uint256 valueOfFraxBefore = valueOfFrax();
         uint256 _fraxBalance = fraxBalance();
 
-        if (_fraxBalance > 0) {
+        // do this so we don't try swapping dust
+        if (balanceOfWantBefore.add(valueOfFraxBefore) > _amount) {
             _curveSwapToWant(_fraxBalance);
-        }
-        uint256 newBalanceOfWant = balanceOfWant();
-
-        if (newBalanceOfWant >= _amount) {
-            return;
+            if (balanceOfWant() >= _amount) {
+                return;
+            }
         }
 
         // make sure our pool is healthy enough for a normal withdrawal
         checkFraxPeg();
 
+        // use this for debugging
+        emit Cloned(fraxLock);
+
         // if we don't have enough free funds, unlock our NFT
-        nftUnlock();
+        _nftUnlock();
 
         // update our amount with the amount we have loose
-        _amount = _amount.sub(newBalanceOfWant);
+        _amount = _amount.sub(balanceOfWant());
 
         // use our "ideal" amount for this so we under-estimate and assess losses on each debt reduction
         // calculate the share of the NFT that our amount needed should be
         uint256 fraction = (_amount).mul(1e18).div(balanceOfNFToptimistic());
 
-        (, , , , , , , uint256 initLiquidity, , , , ) =
+        (, , , , , , , uint128 liquidity, , , , ) =
             IUniNFT(uniNFT).positions(nftId);
 
-        uint256 liquidityRemove = initLiquidity.mul(fraction).div(1e18);
+        // convert between uint128 and uint256, fun!
+        uint256 _liquidity = uint256(liquidity);
+
+        uint256 liquidityToRemove = _liquidity.mul(fraction).div(1e18);
 
         // remove it all if we're in emergency exit
-        if (emergencyExit) {
-            liquidityRemove = initLiquidity;
+        if (fraction >= 1e18 || emergencyExit) {
+            liquidityToRemove = _liquidity;
         }
 
-        // convert between uint128 and uin256, fun!
-        uint128 _liquidityRemove = uint128(liquidityRemove);
+        // convert between uint128 and uint256, fun!
+        uint128 _liquidityToRemove = uint128(liquidityToRemove);
 
         // remove our specified liquidity amount
         IUniNFT.decreaseStruct memory setDecrease =
             IUniNFT.decreaseStruct(
                 nftId,
-                _liquidityRemove,
+                _liquidityToRemove,
                 0,
                 0,
                 block.timestamp
@@ -533,7 +538,7 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         fxs.transfer(_newStrategy, fxs.balanceOf(address(this)));
 
         // unlock and send our NFT to our new strategy
-        nftUnlock();
+        _nftUnlock();
         IERC721(uniNFT).approve(_newStrategy, nftId);
         IERC721(uniNFT).transferFrom(address(this), _newStrategy, nftId);
     }
@@ -647,11 +652,15 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         return this.onERC721Received.selector;
     }
 
-    function nftUnlock() public onlyEmergencyAuthorized {
+    function _nftUnlock() internal {
         address nftOwner = IUniNFT(uniNFT).ownerOf(nftId);
-        if (nftOwner == address(fraxLock)) {
+        if (nftOwner == fraxLock) {
             IFrax(fraxLock).withdrawLocked(nftId);
         }
+    }
+
+    function nftUnlock() external onlyEmergencyAuthorized {
+        _nftUnlock();
     }
 
     /* ========== FUNCTION GRAVEYARD ========== */

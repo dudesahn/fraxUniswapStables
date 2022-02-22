@@ -75,8 +75,8 @@ def test_simple_harvest(
 
     # harvest, store new asset amount
     chain.sleep(1)
-    tx = strategy.harvest({"from": gov})
-    print("The is our harvest info:", tx.events["Harvested"])
+    harvest = strategy.harvest({"from": gov})
+    print("The is our harvest info:", harvest.events["Harvested"])
     chain.sleep(1)
     new_assets = vault.totalAssets()
     # confirm we made money, or at least that we have about the same
@@ -115,7 +115,7 @@ def test_simple_harvest(
     chain.sleep(86400)
 
     # withdraw and confirm our whale made money, or that we didn't lose more than dust
-    vault.withdraw(2 ** 256 - 1, whale, 10_000, {"from": whale})
+    tx = vault.withdraw(2 ** 256 - 1, whale, 10_000, {"from": whale})
     loss = startingWhale - token.balanceOf(whale)
     print("Losses:", loss / vault.decimals())
     
@@ -216,8 +216,8 @@ def test_simple_harvest_with_uni_fees(
 
     # harvest, store new asset amount
     chain.sleep(1)
-    tx = strategy.harvest({"from": gov})
-    print("The is our harvest info:", tx.events["Harvested"])
+    harvest = strategy.harvest({"from": gov})
+    print("The is our harvest info:", harvest.events["Harvested"])
     chain.sleep(1)
     new_assets = vault.totalAssets()
     # confirm we made money, or at least that we have about the same
@@ -251,11 +251,12 @@ def test_simple_harvest_with_uni_fees(
         ),
     )
 
-    # simulate 1 day of earnings
+    # simulate 1 day for share price to go back up
     chain.mine(1)
     chain.sleep(86400)
 
     # withdraw and confirm our whale made money, or that we didn't lose more than dust
-    vault.withdraw(2 ** 256 - 1, whale, 10_000, {"from": whale})
+    strategy.setEmergencyExit()
+    tx = vault.withdraw(amount / 2, whale, 10_000, {"from": whale})
     loss = startingWhale - token.balanceOf(whale)
     print("Losses:", loss / vault.decimals())
