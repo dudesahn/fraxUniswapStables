@@ -10,7 +10,6 @@ from brownie import Wei, accounts, Contract, config
 from brownie import StrategyFraxUniswapUSDC
 
 
-@pytest.mark.require_network("mainnet-fork")
 def test_operation(
     chain,
     vault,
@@ -126,3 +125,4 @@ def test_operation(
 
     # We should have made profit
     assert vault.pricePerShare() > 1e6
+    assert vault.totalAssets() == 0
