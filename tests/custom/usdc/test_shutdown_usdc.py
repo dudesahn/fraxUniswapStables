@@ -97,18 +97,21 @@ def test_operation(
     chain.mine(1)
 
     alice_vault_balance = vault.balanceOf(alice)
-    vault.withdraw(alice_vault_balance, alice, 75, {"from": alice})
+    tx = vault.withdraw(alice_vault_balance, alice, 75, {"from": alice})
+    print("Info", tx.info())
     assert usdc.balanceOf(alice) > 0
     assert usdc.balanceOf(bob) == 0
     #assert frax.balanceOf(strategy) > 0
 
     bob_vault_balance = vault.balanceOf(bob)
-    vault.withdraw(bob_vault_balance, bob, 75, {"from": bob})
+    tx_2 = vault.withdraw(bob_vault_balance, bob, 75, {"from": bob})
+    print("Info", tx_2.info())
     assert usdc.balanceOf(bob) > 0
     #assert usdc.balanceOf(strategy) == 0
 
     tt_vault_balance = vault.balanceOf(tinytim)
-    vault.withdraw(tt_vault_balance, tinytim, 75, {"from": tinytim})
+    tx_3 = vault.withdraw(tt_vault_balance, tinytim, 75, {"from": tinytim})
+    print("Info", tx_3.info())
     assert usdc.balanceOf(tinytim) > 0
     #assert usdc.balanceOf(strategy) == 0
 
