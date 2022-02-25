@@ -458,37 +458,27 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         }
     }
 
+    event Debug(uint256 indexed amount);
+
     // withdraw some want from the vaults, probably don't want to allow users to initiate this
     // MAKE SURE WE ASSESS LOSSES AND HAVE SLIPPAGE PROTECTION IF NEEDED ******
     function _withdrawSome(uint256 _amount) internal {
-        // check if we have enough free USDC and FRAX to cover the withdrawal
-        uint256 balanceOfWantBefore = balanceOfWant();
-        uint256 valueOfFraxBefore = valueOfFrax();
-        uint256 _fraxBalance = fraxBalance();
-
-        // do this so we don't try swapping dust
-        if (balanceOfWantBefore.add(valueOfFraxBefore) > _amount) {
-            _curveSwapToWant(_fraxBalance);
-            if (balanceOfWant() >= _amount) {
-                return;
-            }
+        // check if we have enough free FRAX to cover the extra needed
+        if (valueOfFrax() > _amount) {
+            _curveSwapToWant(fraxBalance());
+            return;
         }
 
         // make sure our pool is healthy enough for a normal withdrawal
         checkFraxPeg();
 
-        // use this for debugging
-        emit Cloned(fraxLock);
-
         // if we don't have enough free funds, unlock our NFT
         _nftUnlock();
-
-        // update our amount with the amount we have loose
-        _amount = _amount.sub(balanceOfWant());
 
         // use our "ideal" amount for this so we under-estimate and assess losses on each debt reduction
         // calculate the share of the NFT that our amount needed should be
         uint256 fraction = (_amount).mul(1e18).div(balanceOfNFToptimistic());
+        emit Debug(fraction);
 
         (, , , , , , , uint128 liquidity, , , , ) =
             IUniNFT(uniNFT).positions(nftId);
@@ -505,6 +495,9 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
 
         // convert between uint128 and uint256, fun!
         uint128 _liquidityToRemove = uint128(liquidityToRemove);
+
+        // use this for debugging
+        emit Cloned(fraxLock);
 
         // remove our specified liquidity amount
         IUniNFT.decreaseStruct memory setDecrease =
