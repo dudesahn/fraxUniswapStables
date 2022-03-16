@@ -17,36 +17,43 @@ def test_change_debt_with_profit(
 ):
 
     ## deposit to the vault after approving
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
 
-    # sleep long enough to make uniswap v3 happy (need minimum out)
+    # sleep for a day to make sure our NFT is unlocked
     chain.sleep(86400)
 
-    prev_params = vault.strategies(strategy).dict()
+    # check on our NFT LP
+    real_balance = strategy.balanceOfNFTpessimistic() / (10 ** token.decimals())
+    virtual_balance = strategy.balanceOfNFToptimistic() / (10 ** token.decimals())
+    slippage = (virtual_balance - real_balance) / real_balance
+    print("\nHere's how much is in our NFT (pessimistic):", real_balance)
+    print("Here's how much is in our NFT (optimistic):", virtual_balance)
+    print("This is our slippage:", "{:.4%}".format(slippage))
 
-    currentDebt = vault.strategies(strategy)[2]
+    prev_params = vault.strategies(strategy)
+
+    currentDebt = vault.strategies(strategy)["debtRatio"]
     vault.updateStrategyDebtRatio(strategy, currentDebt / 2, {"from": gov})
-    assert vault.strategies(strategy)[2] == 5000
+    assert vault.strategies(strategy)["debtRatio"] == 5000
 
-    chain.sleep(86400 * 3)  # fast forward so our min delay is passed
-    chain.mine(1)
-
-    tx = strategy.harvestTrigger(0, {"from": gov})
-    print("\nShould we harvest? Should be true.", tx)
-    assert tx == True
-
-    # our whale donates dust to the vault, what a nice person!
-    donation = amount
-    token.transfer(strategy, donation, {"from": whale})
-
-    # turn off health check since we just took big profit
+    # turn off health check since we're about to take a big profit
     strategy.setDoHealthCheck(False, {"from": gov})
     chain.sleep(1)
-    strategy.harvest({"from": gov})
-    new_params = vault.strategies(strategy).dict()
+    harvest = strategy.harvest({"from": gov})
+    print("\nThe is our harvest info:", harvest.events["Harvested"])
+
+    # check on our NFT LP
+    real_balance = strategy.balanceOfNFTpessimistic() / (10 ** token.decimals())
+    virtual_balance = strategy.balanceOfNFToptimistic() / (10 ** token.decimals())
+    slippage = (virtual_balance - real_balance) / real_balance
+    print("\nHere's how much is in our NFT (pessimistic):", real_balance)
+    print("Here's how much is in our NFT (optimistic):", virtual_balance)
+    print("This is our slippage:", "{:.4%}".format(slippage))
+    
+    new_params = vault.strategies(strategy)
 
     # sleep 10 hours to increase our credit available for last assert at the bottom.
     chain.sleep(60 * 60 * 10)
@@ -55,14 +62,6 @@ def test_change_debt_with_profit(
 
     # check that we've recorded a gain
     assert profit > 0
-
-    # specifically check that our gain is greater than our donation or confirm we're no more than 10 wei off.
-    if no_profit:
-        assert math.isclose(
-            new_params["totalGain"] - prev_params["totalGain"], donation, abs_tol=10
-        )
-    else:
-        assert new_params["totalGain"] - prev_params["totalGain"] > donation
 
     # check to make sure that our debtRatio is about half of our previous debt
     assert new_params["debtRatio"] == currentDebt / 2

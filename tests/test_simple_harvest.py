@@ -21,49 +21,34 @@ def test_simple_harvest(
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     newWhale = token.balanceOf(whale)
-
-    assert strategy.nftIsLocked() == False
 
     # harvest, store asset amount
     chain.sleep(1)
     chain.mine(1)
-    
+
     # check on our NFT LP
     real_balance = strategy.balanceOfNFTpessimistic() / (10 ** token.decimals())
     virtual_balance = strategy.balanceOfNFToptimistic() / (10 ** token.decimals())
     slippage = (virtual_balance - real_balance) / real_balance
-    print(
-        "\nHere's how much is in our NFT (pessimistic):",
-        real_balance
-    )
-    print(
-        "Here's how much is in our NFT (optimistic):",
-        virtual_balance
-    )
+    print("\nHere's how much is in our NFT (pessimistic):", real_balance)
+    print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
-    
+
     strategy.harvest({"from": gov})
-    chain.sleep(1)  # we currently lock for a day
+    chain.sleep(1)
     chain.mine(1)
-    assert strategy.nftIsLocked() == True
-    
+
     # check on our NFT LP
     real_balance = strategy.balanceOfNFTpessimistic() / (10 ** token.decimals())
     virtual_balance = strategy.balanceOfNFToptimistic() / (10 ** token.decimals())
     slippage = (virtual_balance - real_balance) / real_balance
-    print(
-        "\nHere's how much is in our NFT (pessimistic):",
-        real_balance
-    )
-    print(
-        "Here's how much is in our NFT (optimistic):",
-        virtual_balance
-    )
+    print("\nHere's how much is in our NFT (pessimistic):", real_balance)
+    print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
-    
+
     old_assets = vault.totalAssets()
     assert old_assets > 0
     assert strategy.estimatedTotalAssets() > 0
@@ -87,19 +72,13 @@ def test_simple_harvest(
     print(
         "\nVault total assets after 1 harvest: ", new_assets / (10 ** token.decimals())
     )
-    
+
     # check on our NFT LP
     real_balance = strategy.balanceOfNFTpessimistic() / (10 ** token.decimals())
     virtual_balance = strategy.balanceOfNFToptimistic() / (10 ** token.decimals())
     slippage = (virtual_balance - real_balance) / real_balance
-    print(
-        "\nHere's how much is in our NFT (pessimistic):",
-        real_balance
-    )
-    print(
-        "Here's how much is in our NFT (optimistic):",
-        virtual_balance
-    )
+    print("\nHere's how much is in our NFT (pessimistic):", real_balance)
+    print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
 
     # Display estimated APR
@@ -110,16 +89,27 @@ def test_simple_harvest(
         ),
     )
 
-    # simulate 1 day of earnings
+    # simulate 1 day of earnings so our LP will unlock
+    chain.mine(1)
+    chain.sleep(86400)
+    
+    # turn off auto-restake since we want to withdraw after this harvest
+    strategy.setManagerParams(False, False, {"from": gov})
+    harvest = strategy.harvest({"from": gov})
+    print("The is our harvest info:", harvest.events["Harvested"])
+    
+    # simulate 1 day for share price to rise
     chain.mine(1)
     chain.sleep(86400)
 
-    # withdraw and confirm our whale made money, or that we didn't lose more than dust
-    tx = vault.withdraw(2 ** 256 - 1, whale, 10_000, {"from": whale})
+    # withdraw and check on our losses (due to slippage on big swaps in/out)
+    tx = vault.withdraw(amount, whale, 10_000, {"from": whale})
     loss = startingWhale - token.balanceOf(whale)
-    print("Losses:", loss / vault.decimals())
-    
-    
+    print("Losses from withdrawal slippage:", loss / (10 ** token.decimals()))
+    assert vault.pricePerShare() > 10 ** token.decimals()
+    print("Vault share price", vault.pricePerShare() / (10 ** token.decimals()))
+
+
 # simulate some trading in the uniswap pool with our whale
 def test_simple_harvest_with_uni_fees(
     gov,
@@ -137,74 +127,70 @@ def test_simple_harvest_with_uni_fees(
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     newWhale = token.balanceOf(whale)
-
-    assert strategy.nftIsLocked() == False
 
     # harvest, store asset amount
     chain.sleep(1)
     chain.mine(1)
-    
+
     # check on our NFT LP
     real_balance = strategy.balanceOfNFTpessimistic() / (10 ** token.decimals())
     virtual_balance = strategy.balanceOfNFToptimistic() / (10 ** token.decimals())
     slippage = (virtual_balance - real_balance) / real_balance
-    print(
-        "\nHere's how much is in our NFT (pessimistic):",
-        real_balance
-    )
-    print(
-        "Here's how much is in our NFT (optimistic):",
-        virtual_balance
-    )
+    print("\nHere's how much is in our NFT (pessimistic):", real_balance)
+    print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
-    
+
     strategy.harvest({"from": gov})
     chain.sleep(1)  # we currently lock for a day
     chain.mine(1)
-    assert strategy.nftIsLocked() == True
-    
-    # set our keepFXS to 100% so we're only getting trading fees as profit
-    strategy.setGovParams(gov, gov, 10_000, strategy.nftId(), 86400, {"from": gov})
-    
+
+    # check on our NFT LP
+    real_balance = strategy.balanceOfNFTpessimistic() / (10 ** token.decimals())
+    virtual_balance = strategy.balanceOfNFToptimistic() / (10 ** token.decimals())
+    slippage = (virtual_balance - real_balance) / real_balance
+    print("\nHere's how much is in our NFT (pessimistic):", real_balance)
+    print("Here's how much is in our NFT (optimistic):", virtual_balance)
+    print("This is our slippage:", "{:.4%}".format(slippage))
+
     # have our whale trade in the uniV3 pool a bunch to generate some fees
     uni_values_token = [token.address, 500, frax.address]
     uni_values_frax = [frax.address, 500, token.address]
-    uni_types = ('address', 'uint24', 'address')
+    uni_types = ("address", "uint24", "address")
     packed_path_token = encode_abi_packed(uni_types, uni_values_token)
     packed_path_frax = encode_abi_packed(uni_types, uni_values_frax)
     uni_router = Contract("0xE592427A0AEce92De3Edee1F18E0157C05861564")
-    token.approve(uni_router, 2 ** 256 - 1, {"from": whale})
-    frax.approve(uni_router, 2 ** 256 - 1, {"from": whale})
+    token.approve(uni_router, 2**256 - 1, {"from": whale})
+    frax.approve(uni_router, 2**256 - 1, {"from": whale})
+    print("\nLet's do some trading!")
     for i in range(3):
-        to_swap = token.balanceOf(whale) / 5 # whale has like $200m USDC, we don't need to do that lol
-        exact_input = (packed_path_token, whale.address, 2 ** 256 - 1, to_swap, 1)
+        to_swap = (
+            token.balanceOf(whale) / 5
+        )  # whale has like $200m USDC, we don't need to do that lol
+        exact_input = (packed_path_token, whale.address, 2**256 - 1, to_swap, 1)
         uni_router.exactInput(exact_input, {"from": whale})
         chain.sleep(1)
         chain.mine(1)
         to_swap = frax.balanceOf(whale)
-        exact_input_frax = (packed_path_frax, whale.address, 2 ** 256 - 1, to_swap, 1)
+        exact_input_frax = (packed_path_frax, whale.address, 2**256 - 1, to_swap, 1)
         uni_router.exactInput(exact_input_frax, {"from": whale})
-        print("\nDone with round", i)
+        print("Done with round", i)
         chain.sleep(1)
         chain.mine(1)
-    
+        
+    tradingLosses = newWhale - token.balanceOf(whale)
+    print("USDC lost trading", tradingLosses / (10 ** token.decimals()))
+
     # check on our NFT LP
     real_balance = strategy.balanceOfNFTpessimistic() / (10 ** token.decimals())
     virtual_balance = strategy.balanceOfNFToptimistic() / (10 ** token.decimals())
     slippage = (virtual_balance - real_balance) / real_balance
-    print(
-        "\nHere's how much is in our NFT (pessimistic):",
-        real_balance
-    )
-    print(
-        "Here's how much is in our NFT (optimistic):",
-        virtual_balance
-    )
+    print("\nHere's how much is in our NFT (pessimistic):", real_balance)
+    print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
-    
+
     old_assets = vault.totalAssets()
     assert old_assets > 0
     assert strategy.estimatedTotalAssets() > 0
@@ -226,37 +212,49 @@ def test_simple_harvest_with_uni_fees(
     else:
         assert new_assets >= old_assets
     print(
-        "\nVault total assets after 1 harvest: ", new_assets / (10 ** token.decimals())
+        "\nVault total assets after harvest: ", new_assets / (10 ** token.decimals())
     )
-    
+
     # check on our NFT LP
     real_balance = strategy.balanceOfNFTpessimistic() / (10 ** token.decimals())
     virtual_balance = strategy.balanceOfNFToptimistic() / (10 ** token.decimals())
     slippage = (virtual_balance - real_balance) / real_balance
-    print(
-        "\nHere's how much is in our NFT (pessimistic):",
-        real_balance
-    )
-    print(
-        "Here's how much is in our NFT (optimistic):",
-        virtual_balance
-    )
+    print("\nHere's how much is in our NFT (pessimistic):", real_balance)
+    print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
 
     # Display estimated APR
     print(
-        "\nEstimated APR with only trading fees: ",
+        "\nEstimated APR with trading fees: ",
         "{:.2%}".format(
             ((new_assets - old_assets) * (365)) / (strategy.estimatedTotalAssets())
         ),
     )
 
-    # simulate 1 day for share price to go back up
-    chain.mine(1)
+    # simulate 1 day of earnings so our LP will unlock
     chain.sleep(86400)
+    chain.mine(1)
+    
+    # turn off auto-restake since we want to withdraw after this harvest
+    strategy.setManagerParams(False, False, {"from": gov})
+    harvest = strategy.harvest({"from": gov})
+    print("\nThe is our harvest info:", harvest.events["Harvested"])
 
-    # withdraw and confirm our whale made money, or that we didn't lose more than dust
-    strategy.setEmergencyExit()
-    tx = vault.withdraw(amount / 2, whale, 10_000, {"from": whale})
-    loss = startingWhale - token.balanceOf(whale)
-    print("Losses:", loss / vault.decimals())
+    # check on our NFT LP
+    real_balance = strategy.balanceOfNFTpessimistic() / (10 ** token.decimals())
+    virtual_balance = strategy.balanceOfNFToptimistic() / (10 ** token.decimals())
+    slippage = (virtual_balance - real_balance) / real_balance
+    print("\nHere's how much is in our NFT (pessimistic):", real_balance)
+    print("Here's how much is in our NFT (optimistic):", virtual_balance)
+    print("This is our slippage:", "{:.4%}".format(slippage))
+    
+    # simulate 1 day for share price to rise
+    chain.sleep(86400)
+    chain.mine(1)
+    
+    # withdraw and check on our losses (due to slippage on big swaps in/out)
+    tx = vault.withdraw(amount, whale, 10_000, {"from": whale})
+    loss = startingWhale - token.balanceOf(whale) - tradingLosses
+    print("Losses from withdrawal slippage:", loss / (10 ** token.decimals()))
+    assert vault.pricePerShare() > 10 ** token.decimals()
+    print("Vault share price", vault.pricePerShare() / (10 ** token.decimals()))

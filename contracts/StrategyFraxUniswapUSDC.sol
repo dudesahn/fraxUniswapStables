@@ -45,6 +45,8 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
     uint256 public fraxTimelockSet;
     address public refer;
     address public voter;
+    uint256 public nftUnlockTime; // timestamp that we can withdraw our staked NFT
+    uint256 public priorDustBalance; // how much USDC+FRAX dust we ended our last harvest with
 
     // these are variables specific to our want-FRAX pair
     uint256 public nftId;
@@ -184,17 +186,11 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
     /// @notice Returns additional USDC we get if we swap our FRAX on Curve
     function valueOfFrax() public view returns (uint256) {
         // see how much USDC we would get for our FRAX on curve
-        uint256 usdcCurveOut = curve.get_dy_underlying(0, 2, fraxBalance());
-
-        return usdcCurveOut;
-    }
-
-    function nftIsLocked() public view returns (bool) {
-        uint256 lockedAmount = IFrax(fraxLock).lockedLiquidityOf(address(this));
-        if (lockedAmount > 0) {
-            return true;
+        uint256 currentFrax = fraxBalance();
+        if (currentFrax > 0) {
+            return curve.get_dy_underlying(0, 2, fraxBalance());
         } else {
-            return false;
+            return 0;
         }
     }
 
@@ -239,6 +235,8 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         )
     {
         // in normal situations we can simply use our loose tokens as profit
+        // THIS IGNORES ANY DONATED PROFIT HMMMMMM. would probably be better to track how much we had at the end of our last harvest?
+        // what about withdrawals? maybe don't really need to add that var, instead can just have the checkTrueHoldings since it's an edge case for donations
         uint256 beforeStableBalance = balanceOfWant().add(valueOfFrax());
 
         // claim our rewards. this will give us FXS (emissions), FRAX, and USDC (fees)
@@ -287,7 +285,7 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
             }
         }
 
-        // use this to check our profit/loss if we suspect the pool is imbalanced in one way or the other
+        // use this to check our profit/loss if we suspect the pool is imbalanced in one way or the other, or if we get donations
         if (checkTrueHoldings) {
             uint256 assets = estimatedTotalAssets();
             uint256 debt = vault.strategies(address(this)).totalDebt;
@@ -343,18 +341,22 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
     }
 
     function _curveSwapToFrax(uint256 _amountIn) internal {
-        // use our slippage tolerance
+        // use our slippage tolerance, convert between USDC (1e6) -> FRAX (1e18)
         uint256 _amountOut =
-            _amountIn.mul(DENOMINATOR.sub(slippageMax)).div(DENOMINATOR);
+            _amountIn.mul(DENOMINATOR.sub(slippageMax)).div(DENOMINATOR).mul(
+                1e12
+            );
 
         // USDC is 2, DAI is 1, Tether is 3, frax is 0
-        curve.exchange_underlying(2, 0, _amountIn, 0);
+        curve.exchange_underlying(2, 0, _amountIn, _amountOut);
     }
 
     function _curveSwapToWant(uint256 _amountIn) internal {
-        // use our slippage tolerance
+        // use our slippage tolerance, convert between FRAX (1e18) -> USDC (1e6)
         uint256 _amountOut =
-            _amountIn.mul(DENOMINATOR.sub(slippageMax)).div(DENOMINATOR);
+            _amountIn.mul(DENOMINATOR.sub(slippageMax)).div(DENOMINATOR).div(
+                1e12
+            );
 
         // USDC is 2, DAI is 1, Tether is 3, frax is 0
         curve.exchange_underlying(0, 2, _amountIn, _amountOut);
@@ -366,8 +368,11 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
             return;
         }
 
-        // unlock our NFT so we can withdraw or deposit more as needed
-        _nftUnlock();
+        // NFT has to be unlocked before we can do anything with it
+        require(block.timestamp > nftUnlockTime, "Wait for NFT to unlock!");
+
+        // unstake our NFT so we can withdraw or deposit more as needed
+        _nftUnstake();
 
         // only re-lock our profits if our bool is true
         if (reLockProfits) {
@@ -398,8 +403,14 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
             }
 
             // re-lock our NFT for more rewards
-            IFrax(fraxLock).stakeLocked(nftId, fraxTimelockSet);
+            uint256 lockTime = fraxTimelockSet;
+            IFrax(fraxLock).stakeLocked(nftId, lockTime);
+
+            // update our new unlock time
+            nftUnlockTime = block.timestamp.add(lockTime);
         }
+
+        // record our free USDC and FRAX at the end of our harvest
     }
 
     // this is only called externally by user withdrawals
@@ -472,8 +483,11 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         // make sure our pool is healthy enough for a normal withdrawal
         checkFraxPeg();
 
-        // if we don't have enough free funds, unlock our NFT
-        _nftUnlock();
+        // NFT has to be unlocked before we can do anything with it
+        require(block.timestamp > nftUnlockTime, "Wait for NFT to unlock!");
+
+        // if we don't have enough free funds, unstake our NFT
+        _nftUnstake();
 
         // use our "ideal" amount for this so we under-estimate and assess losses on each debt reduction
         // calculate the share of the NFT that our amount needed should be
@@ -523,6 +537,8 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
 
         // swap our FRAX balance to USDC
         _curveSwapToWant(fraxBalance());
+
+        // record our free USDC and FRAX at the end of our harvest
     }
 
     // transfers all tokens to new strategy
@@ -530,8 +546,11 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         frax.transfer(_newStrategy, fraxBalance());
         fxs.transfer(_newStrategy, fxs.balanceOf(address(this)));
 
-        // unlock and send our NFT to our new strategy
-        _nftUnlock();
+        // NFT has to be unlocked before we can do anything with it
+        require(block.timestamp > nftUnlockTime, "Wait for NFT to unlock!");
+
+        // unstake and send our NFT to our new strategy
+        _nftUnstake();
         IERC721(uniNFT).approve(_newStrategy, nftId);
         IERC721(uniNFT).transferFrom(address(this), _newStrategy, nftId);
     }
@@ -556,11 +575,12 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
     }
 
     ///@notice This allows us to decide to automatically re-lock our NFT with profits after a harvest
-    function setReLockProfits(bool _reLockProfits)
+    function setManagerParams(bool _reLockProfits, bool _checkTrueHoldings)
         external
-        onlyEmergencyAuthorized
+        onlyVaultManagers
     {
         reLockProfits = _reLockProfits;
+        checkTrueHoldings = _checkTrueHoldings;
     }
 
     // This function is needed to initialize the entire strategy.
@@ -568,7 +588,7 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
     // This will run through the process of minting the NFT on UniV3
     // that NFT will be the NFT we use for this strat. We will add/sub balances, but never burn the NFT
     // it will always have dust, accordingly
-    function mintNFT() external onlyEmergencyAuthorized {
+    function mintNFT() external onlyVaultManagers {
         require(
             (balanceOfWant() > 0 &&
                 IUniNFT(uniNFT).balanceOf(address(this)) == 0),
@@ -645,15 +665,15 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         return this.onERC721Received.selector;
     }
 
-    function _nftUnlock() internal {
+    function _nftUnstake() internal {
         address nftOwner = IUniNFT(uniNFT).ownerOf(nftId);
         if (nftOwner == fraxLock) {
             IFrax(fraxLock).withdrawLocked(nftId);
         }
     }
 
-    function nftUnlock() external onlyEmergencyAuthorized {
-        _nftUnlock();
+    function nftUnstake() external onlyVaultManagers {
+        _nftUnstake();
     }
 
     /* ========== FUNCTION GRAVEYARD ========== */
