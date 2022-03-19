@@ -46,7 +46,7 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
     address public refer;
     address public voter;
     uint256 public nftUnlockTime; // timestamp that we can withdraw our staked NFT
-    uint256 public priorDustBalance; // how much USDC+FRAX dust we ended our last harvest with
+    // uint256 public priorDustBalance; // how much USDC+FRAX dust we ended our last harvest with
 
     // these are variables specific to our want-FRAX pair
     uint256 public nftId;
