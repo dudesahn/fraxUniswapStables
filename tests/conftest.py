@@ -8,7 +8,11 @@ def isolation(fn_isolation):
     pass
 
 
-@pytest.fixture(scope="module", autouse=False)
+# set this for if we want to use tenderly or not; mostly helpful because with brownie.reverts fails in tenderly forks.
+use_tenderly = True
+
+
+@pytest.fixture(scope="module", autouse=use_tenderly)
 def tenderly_fork(web3, chain):
     fork_base_url = "https://simulate.yearn.network/fork"
     payload = {"network_id": str(chain.id)}
@@ -19,6 +23,12 @@ def tenderly_fork(web3, chain):
     tenderly_provider = web3.HTTPProvider(fork_rpc_url, {"timeout": 600})
     web3.provider = tenderly_provider
     print(f"https://dashboard.tenderly.co/yearn/yearn-web/fork/{fork_id}")
+
+
+@pytest.fixture(scope="module")
+def tests_using_tenderly():
+    yes_or_no = use_tenderly
+    yield yes_or_no
 
 
 @pytest.fixture(scope="module")
@@ -69,12 +79,12 @@ def frax():
 
 @pytest.fixture(scope="module")
 def other_vault_strategy():
-    yield Contract("0xfF8bb7261E4D51678cB403092Ae219bbEC52aa51")
+    yield Contract("0x446A79e655f68a96560E35577A0a3a017EE0C04a")
 
 
 @pytest.fixture(scope="module")
-def farmed():
-    yield Contract("0x7d016eec9c25232b01F23EF992D98ca97fc2AF5a")
+def farmed(): # ALCX
+    yield Contract("0xdBdb4d16EdA451D0503b854CF79D55697F90c8DF")
 
 
 @pytest.fixture(scope="module")
@@ -89,6 +99,11 @@ def zero_address():
     yield zero_address
 
 
+@pytest.fixture(scope="module")
+def gas_oracle():
+    yield Contract("0xb5e1CAcB567d98faaDB60a1fD4820720141f064F")
+
+
 # Define any accounts in this section
 # for live testing, governance is the strategist MS; we will update this before we endorse
 # normal gov is ychad, 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52
@@ -100,7 +115,7 @@ def gov(accounts):
 @pytest.fixture(scope="module")
 def strategist_ms(accounts):
     # like governance, but better
-    yield accounts.at("0x72a34AbafAB09b15E7191822A679f28E067C4a16", force=True)
+    yield accounts.at("0x16388463d60FFE0661Cf7F1f31a7D658aC790ff7", force=True)
 
 
 @pytest.fixture(scope="module")
@@ -167,6 +182,7 @@ def strategy(
     chain,
     strategist_ms,
     whale,
+    gas_oracle,
 ):
     # make sure to include all constructor parameters needed here
     strategy = strategist.deploy(
@@ -180,10 +196,20 @@ def strategy(
     vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
     strategy.setHealthCheck(healthCheck, {"from": gov})
     strategy.setDoHealthCheck(True, {"from": gov})
+    
+    ## don't worry about gas prices
+    gas_oracle.setMaxAcceptableBaseFee(20000 * 1e9, {"from": strategist_ms})
+
+    # harvest should trigger false, no assets
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    assert tx == False
 
     # setup our NFT
     token.transfer(strategy, 100e6, {"from": whale})
     strategy.mintNFT({"from": gov})
+
+    # do this for our tenderly verification
+    print("\nThis is our strategy address:", strategy.address)
 
     yield strategy
 

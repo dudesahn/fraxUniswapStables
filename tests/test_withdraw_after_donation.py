@@ -25,14 +25,13 @@ def test_withdraw_after_donation_1(
 
     prev_params = vault.strategies(strategy).dict()
 
-    currentDebt = vault.strategies(strategy)[2]
+    currentDebt = vault.strategies(strategy)["debtRatio"]
     vault.updateStrategyDebtRatio(strategy, currentDebt / 2, {"from": gov})
-    assert vault.strategies(strategy)[2] == 5000
+    assert vault.strategies(strategy)["debtRatio"] == 5000
 
-    # under our new method of using min and maxDelay, this no longer matters or works
-    # tx = new_strategy.harvestTrigger(0, {"from": gov})
-    # print("\nShould we harvest? Should be true.", tx)
-    # assert tx == True
+    # simulate one day of earnings
+    chain.sleep(86400)
+    chain.mine(1)
 
     # our whale donates dust to the vault, what a nice person!
     donation = amount / 2
@@ -40,15 +39,14 @@ def test_withdraw_after_donation_1(
 
     # have our whale withdraw half of his donation, this ensures that we test withdrawing without pulling from the staked balance
     vault.withdraw(donation / 2, {"from": whale})
-
-    # simulate one day of earnings
-    chain.sleep(86400)
-    chain.mine(1)
+    
+    # try to check our true holdings to see this profit
+    tx = strategy.setManagerParams(True, True, {"from": gov})
 
     # turn off health check since we just took big profit
     strategy.setDoHealthCheck(False, {"from": gov})
     chain.sleep(1)
-    strategy.harvest({"from": gov})
+    harvest = strategy.harvest({"from": gov})
     new_params = vault.strategies(strategy).dict()
 
     # sleep 10 hours to increase our credit available for last assert at the bottom.
@@ -106,14 +104,13 @@ def test_withdraw_after_donation_2(
 
     prev_params = vault.strategies(strategy).dict()
 
-    currentDebt = vault.strategies(strategy)[2]
+    currentDebt = vault.strategies(strategy)["debtRatio"]
     vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
-    assert vault.strategies(strategy)[2] == 0
+    assert vault.strategies(strategy)["debtRatio"] == 0
 
-    # under our new method of using min and maxDelay, this no longer matters or works
-    # tx = new_strategy.harvestTrigger(0, {"from": gov})
-    # print("\nShould we harvest? Should be true.", tx)
-    # assert tx == True
+    # simulate one day of earnings
+    chain.sleep(86400)
+    chain.mine(1)
 
     # our whale donates dust to the vault, what a nice person!
     donation = amount / 2
@@ -121,15 +118,14 @@ def test_withdraw_after_donation_2(
 
     # have our whale withdraw half of his donation, this ensures that we test withdrawing without pulling from the staked balance
     vault.withdraw(donation / 2, {"from": whale})
-
-    # simulate one day of earnings
-    chain.sleep(86400)
-    chain.mine(1)
+    
+    # try to check our true holdings to see this profit
+    tx = strategy.setManagerParams(True, True, {"from": gov})
 
     # turn off health check since we just took big profit
     strategy.setDoHealthCheck(False, {"from": gov})
     chain.sleep(1)
-    strategy.harvest({"from": gov})
+    harvest = strategy.harvest({"from": gov})
     new_params = vault.strategies(strategy).dict()
 
     # sleep 10 hours to increase our credit available for last assert at the bottom.
@@ -187,14 +183,13 @@ def test_withdraw_after_donation_3(
 
     prev_params = vault.strategies(strategy).dict()
 
-    currentDebt = vault.strategies(strategy)[2]
+    currentDebt = vault.strategies(strategy)["debtRatio"]
     vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
-    assert vault.strategies(strategy)[2] == 0
+    assert vault.strategies(strategy)["debtRatio"] == 0
 
-    # under our new method of using min and maxDelay, this no longer matters or works
-    # tx = new_strategy.harvestTrigger(0, {"from": gov})
-    # print("\nShould we harvest? Should be true.", tx)
-    # assert tx == True
+    # simulate one day of earnings
+    chain.sleep(86400)
+    chain.mine(1)
 
     # our whale donates dust to the vault, what a nice person!
     donation = amount / 2
@@ -202,15 +197,14 @@ def test_withdraw_after_donation_3(
 
     # have our whale withdraws more than his donation, ensuring we pull from strategy
     vault.withdraw(donation + amount / 2, {"from": whale})
-
-    # simulate one day of earnings
-    chain.sleep(86400)
-    chain.mine(1)
+    
+    # try to check our true holdings to see this profit
+    tx = strategy.setManagerParams(True, True, {"from": gov})
 
     # turn off health check since we just took big profit
     strategy.setDoHealthCheck(False, {"from": gov})
     chain.sleep(1)
-    strategy.harvest({"from": gov})
+    harvest = strategy.harvest({"from": gov})
     new_params = vault.strategies(strategy).dict()
 
     # sleep 10 hours to increase our credit available for last assert at the bottom.
@@ -268,14 +262,13 @@ def test_withdraw_after_donation_4(
 
     prev_params = vault.strategies(strategy).dict()
 
-    currentDebt = vault.strategies(strategy)[2]
+    currentDebt = vault.strategies(strategy)["debtRatio"]
     vault.updateStrategyDebtRatio(strategy, currentDebt / 2, {"from": gov})
-    assert vault.strategies(strategy)[2] == 5000
+    assert vault.strategies(strategy)["debtRatio"] == 5000
 
-    # under our new method of using min and maxDelay, this no longer matters or works
-    # tx = new_strategy.harvestTrigger(0, {"from": gov})
-    # print("\nShould we harvest? Should be true.", tx)
-    # assert tx == True
+    # simulate one day of earnings
+    chain.sleep(86400)
+    chain.mine(1)
 
     # our whale donates dust to the vault, what a nice person!
     donation = amount / 2
@@ -283,10 +276,6 @@ def test_withdraw_after_donation_4(
 
     # have our whale withdraws more than his donation, ensuring we pull from strategy
     vault.withdraw(donation + amount / 2, {"from": whale})
-
-    # simulate one day of earnings
-    chain.sleep(86400)
-    chain.mine(1)
 
     # turn off health check since we just took big profit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -356,12 +345,12 @@ def test_withdraw_after_donation_5(
     donation = amount / 2
     token.transfer(strategy, donation, {"from": whale})
 
-    # have our whale withdraws more than his donation, ensuring we pull from strategy
-    vault.withdraw(donation + amount / 2, {"from": whale})
-
     # simulate one day of earnings
     chain.sleep(86400)
     chain.mine(1)
+
+    # have our whale withdraws more than his donation, ensuring we pull from strategy
+    vault.withdraw(donation + amount / 2, {"from": whale})
 
     # turn off health check since we just took big profit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -428,12 +417,12 @@ def test_withdraw_after_donation_6(
     donation = amount / 2
     token.transfer(strategy, donation, {"from": whale})
 
-    # have our whale withdraws more than his donation, ensuring we pull from strategy
-    vault.withdraw(donation / 2, {"from": whale})
-
     # simulate one day of earnings
     chain.sleep(86400)
     chain.mine(1)
+
+    # have our whale withdraws more than his donation, ensuring we pull from strategy
+    vault.withdraw(donation / 2, {"from": whale})
 
     # turn off health check since we just took big profit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -497,14 +486,13 @@ def test_withdraw_after_donation_7(
     prev_params = vault.strategies(strategy).dict()
     prev_assets = vault.totalAssets()
 
-    currentDebt = vault.strategies(strategy)[2]
+    currentDebt = vault.strategies(strategy)["debtRatio"]
     vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
-    assert vault.strategies(strategy)[2] == 0
+    assert vault.strategies(strategy)["debtRatio"] == 0
 
-    # under our new method of using min and maxDelay, this no longer matters or works
-    # tx = new_strategy.harvestTrigger(0, {"from": gov})
-    # print("\nShould we harvest? Should be true.", tx)
-    # assert tx == True
+    # simulate one day of earnings
+    chain.sleep(86400)
+    chain.mine(1)
 
     # our whale donates dust to the vault, what a nice person!
     donation = amount / 2
@@ -513,10 +501,6 @@ def test_withdraw_after_donation_7(
     # have our whale withdraws more than his donation, ensuring we pull from strategy
     withdrawal = donation + amount / 2
     vault.withdraw(withdrawal, {"from": whale})
-
-    # simulate one day of earnings
-    chain.sleep(86400)
-    chain.mine(1)
 
     # We harvest twice to take profits and then to send the funds to our strategy. This is for our last check below.
     chain.sleep(1)
@@ -592,14 +576,13 @@ def test_withdraw_after_donation_8(
     prev_params = vault.strategies(strategy).dict()
     prev_assets = vault.totalAssets()
 
-    currentDebt = vault.strategies(strategy)[2]
+    currentDebt = vault.strategies(strategy)["debtRatio"]
     vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
-    assert vault.strategies(strategy)[2] == 0
+    assert vault.strategies(strategy)["debtRatio"] == 0
 
-    # under our new method of using min and maxDelay, this no longer matters or works
-    # tx = new_strategy.harvestTrigger(0, {"from": gov})
-    # print("\nShould we harvest? Should be true.", tx)
-    # assert tx == True
+    # simulate one day of earnings
+    chain.sleep(86400)
+    chain.mine(1)
 
     # our whale donates dust to the vault, what a nice person!
     donation = amount / 2
@@ -608,10 +591,6 @@ def test_withdraw_after_donation_8(
     # have our whale withdraws more than his donation, ensuring we pull from strategy
     withdrawal = donation / 2
     vault.withdraw(withdrawal, {"from": whale})
-
-    # simulate one day of earnings
-    chain.sleep(86400)
-    chain.mine(1)
 
     # We harvest twice to take profits and then to send the funds to our strategy. This is for our last check below.
     chain.sleep(1)

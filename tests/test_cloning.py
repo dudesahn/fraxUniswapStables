@@ -18,46 +18,59 @@ def test_cloning(
     amount,
     no_profit,
     is_slippery,
+    tests_using_tenderly,
 ):
-    # Shouldn't be able to call initialize again
-    with brownie.reverts():
-        strategy.initialize(
+    # tenderly doesn't work for "with brownie.reverts"
+    if tests_using_tenderly:
+        ## clone our strategy
+        tx = strategy.cloneFraxUni(
             vault,
             strategist,
             rewards,
             keeper,
             {"from": gov},
         )
+        newStrategy = StrategyFraxUniswapUSDC.at(tx.return_value)
+    else:
+        # Shouldn't be able to call initialize again
+        with brownie.reverts():
+            strategy.initialize(
+                vault,
+                strategist,
+                rewards,
+                keeper,
+                {"from": gov},
+            )
 
-    ## clone our strategy
-    tx = strategy.cloneFraxUni(
-        vault,
-        strategist,
-        rewards,
-        keeper,
-        {"from": gov},
-    )
-    newStrategy = StrategyFraxUniswapUSDC.at(tx.return_value)
-
-    # Shouldn't be able to call initialize again
-    with brownie.reverts():
-        newStrategy.initialize(
+        ## clone our strategy
+        tx = strategy.cloneFraxUni(
             vault,
             strategist,
             rewards,
             keeper,
             {"from": gov},
         )
+        newStrategy = StrategyFraxUniswapUSDC.at(tx.return_value)
 
-    ## shouldn't be able to clone a clone
-    with brownie.reverts():
-        newStrategy.cloneFraxUni(
-            vault,
-            strategist,
-            rewards,
-            keeper,
-            {"from": gov},
-        )
+        # Shouldn't be able to call initialize again
+        with brownie.reverts():
+            newStrategy.initialize(
+                vault,
+                strategist,
+                rewards,
+                keeper,
+                {"from": gov},
+            )
+
+        ## shouldn't be able to clone a clone
+        with brownie.reverts():
+            newStrategy.cloneFraxUni(
+                vault,
+                strategist,
+                rewards,
+                keeper,
+                {"from": gov},
+            )
 
     # revoke and send all funds back to vault
     vault.revokeStrategy(strategy, {"from": gov})
@@ -65,6 +78,10 @@ def test_cloning(
 
     # attach our new strategy and approve it on the proxy
     vault.addStrategy(newStrategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
+
+    # setup our NFT on our new strategy, IMPORTANT***
+    token.transfer(newStrategy, 100e6, {"from": whale})
+    newStrategy.mintNFT({"from": gov})
 
     assert vault.withdrawalQueue(1) == newStrategy
     assert vault.strategies(newStrategy)["debtRatio"] == 10_000
@@ -81,9 +98,8 @@ def test_cloning(
     tx = newStrategy.harvest({"from": gov})
     old_assets_dai = vault.totalAssets()
     assert old_assets_dai > 0
-    assert token.balanceOf(newStrategy) == 0
     assert newStrategy.estimatedTotalAssets() > 0
-    print("\nStarting Assets: ", old_assets_dai / 1e18)
+    print("\nStarting Assets: ", old_assets_dai / (10 ** token.decimals()))
 
     # simulate one day of earnings
     chain.sleep(86400)
@@ -99,7 +115,7 @@ def test_cloning(
     else:
         assert new_assets_dai >= old_assets_dai
 
-    print("\nAssets after 2 days: ", new_assets_dai / 1e18)
+    print("\nAssets after 2 days: ", new_assets_dai / (10 ** token.decimals()))
 
     # Display estimated APR
     print(
@@ -114,10 +130,9 @@ def test_cloning(
     chain.sleep(86400)
     chain.mine(1)
 
-    # withdraw and confirm our whale made money, or that we didn't lose more than dust
-    vault.withdraw({"from": whale})
-    if is_slippery and no_profit:
-        assert math.isclose(token.balanceOf(whale), startingWhale, abs_tol=10)
-    else:
-        assert token.balanceOf(whale) >= startingWhale
-    assert vault.pricePerShare() >= before_pps
+    # withdraw and check on our losses (due to slippage on big swaps in/out)
+    tx = vault.withdraw(amount, whale, 10_000, {"from": whale})
+    loss = startingWhale - token.balanceOf(whale)
+    print("Losses from withdrawal slippage:", loss / (10 ** token.decimals()))
+    assert vault.pricePerShare() > 10 ** token.decimals()
+    print("Vault share price", vault.pricePerShare() / (10 ** token.decimals()))

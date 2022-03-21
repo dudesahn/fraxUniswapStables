@@ -92,12 +92,12 @@ def test_simple_harvest(
     # simulate 1 day of earnings so our LP will unlock
     chain.mine(1)
     chain.sleep(86400)
-    
+
     # turn off auto-restake since we want to withdraw after this harvest
     strategy.setManagerParams(False, False, {"from": gov})
     harvest = strategy.harvest({"from": gov})
     print("The is our harvest info:", harvest.events["Harvested"])
-    
+
     # simulate 1 day for share price to rise
     chain.mine(1)
     chain.sleep(86400)
@@ -179,7 +179,7 @@ def test_simple_harvest_with_uni_fees(
         print("Done with round", i)
         chain.sleep(1)
         chain.mine(1)
-        
+
     tradingLosses = newWhale - token.balanceOf(whale)
     print("USDC lost trading", tradingLosses / (10 ** token.decimals()))
 
@@ -211,9 +211,7 @@ def test_simple_harvest_with_uni_fees(
         assert math.isclose(new_assets, old_assets, abs_tol=10)
     else:
         assert new_assets >= old_assets
-    print(
-        "\nVault total assets after harvest: ", new_assets / (10 ** token.decimals())
-    )
+    print("\nVault total assets after harvest: ", new_assets / (10 ** token.decimals()))
 
     # check on our NFT LP
     real_balance = strategy.balanceOfNFTpessimistic() / (10 ** token.decimals())
@@ -234,7 +232,7 @@ def test_simple_harvest_with_uni_fees(
     # simulate 1 day of earnings so our LP will unlock
     chain.sleep(86400)
     chain.mine(1)
-    
+
     # turn off auto-restake since we want to withdraw after this harvest
     strategy.setManagerParams(False, False, {"from": gov})
     harvest = strategy.harvest({"from": gov})
@@ -247,11 +245,11 @@ def test_simple_harvest_with_uni_fees(
     print("\nHere's how much is in our NFT (pessimistic):", real_balance)
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
-    
+
     # simulate 1 day for share price to rise
     chain.sleep(86400)
     chain.mine(1)
-    
+
     # withdraw and check on our losses (due to slippage on big swaps in/out)
     tx = vault.withdraw(amount, whale, 10_000, {"from": whale})
     loss = startingWhale - token.balanceOf(whale) - tradingLosses

@@ -13,10 +13,11 @@ def test_odds_and_ends(
     strategy,
     chain,
     strategist_ms,
-    pid,
     StrategyFraxUniswapUSDC,
     amount,
     is_slippery,
+    healthCheck,
+    no_profit,
 ):
 
     ## deposit to the vault after approving. turn off health check before each harvest since we're doing weird shit
@@ -28,28 +29,41 @@ def test_odds_and_ends(
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
-    # send away all funds, will need to alter this based on strategy
-    masterchef = Contract("0x2352b745561e7e6FCD03c093cE7220e3e126ace0")
-    strategy_staked = strategy.xbooStakedInMasterchef()
-    masterchef.withdraw(pid, strategy_staked, {"from": strategy})
-    xboo = Contract("0xa48d959AE2E88f1dAA7D5F611E01908106dE7598")
-    to_send = xboo.balanceOf(strategy)
-    print("xBoo Balance of Vault", to_send)
-    xboo.transfer(gov, to_send, {"from": strategy})
-    assert strategy.estimatedTotalAssets() == 0
-
-    chain.sleep(86400 * 4)  # fast forward so our min delay is passed
+    # simulate 1 day of earnings
+    chain.sleep(86400)
     chain.mine(1)
+    chain.sleep(1)
+    
+    # make sure we don't re-lock our NFT so we can send it away
+    strategy.setManagerParams(False, False, {"from": gov})
+    strategy.harvest({"from": gov})
+    chain.mine(1)
+    chain.sleep(1)
+
+    # send away all funds, will need to alter this based on strategy
+    # profits from the last harvest should still be in the vault
+    nft_contract = Contract("0xC36442b4a4522E871399CD717aBDD847Ab11FE88")
+    nft_contract.transferFrom(strategy, whale, strategy.nftId(), {"from": strategy})
+    token.transfer(whale, token.balanceOf(strategy), {"from": strategy})
+    assert strategy.estimatedTotalAssets() == 0
+    
+    # reset our nftID to 1 since we sent away our NFT
+    strategy.setGovParams(strategy.refer(), strategy.voter(), 0, 1, 86400, strategy.nftUnlockTime(), {"from": gov})
+
+    # simulate 1 day of earnings
+    chain.sleep(86400)
+    chain.mine(1)
+    chain.sleep(1)
 
     chain.sleep(1)
     strategy.setDoHealthCheck(False, {"from": gov})
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
-    # we can also withdraw from an empty vault as well
-    vault.withdraw({"from": whale})
-
-    # we can try to migrate too, lol
+    # we can also withdraw from an empty vault as well, but make sure we're okay with taking a loss
+    vault.withdraw(amount, whale, 10000, {"from": whale})
+    
+    # we can try migrating too!
     # deploy our new strategy
     new_strategy = strategist.deploy(
         StrategyFraxUniswapUSDC,
@@ -57,20 +71,52 @@ def test_odds_and_ends(
     )
     total_old = strategy.estimatedTotalAssets()
 
+    # simulate 1 day of earnings, let our NFT unlock
+    chain.sleep(86400)
+    chain.mine(1)
+
+    # store our NFT id
+    nft_id = strategy.nftId()
+
     # migrate our old strategy
     vault.migrateStrategy(strategy, new_strategy, {"from": gov})
+    new_strategy.setHealthCheck(healthCheck, {"from": gov})
+    new_strategy.setDoHealthCheck(True, {"from": gov})
+    
+    # update our debtRatio, the big withdrawal and loss previously reduced the debtRatio on the old strategy
+    vault.updateStrategyDebtRatio(new_strategy, 10000, {"from": gov})
+
+    # check that we updated our old nftId to 1
+    assert strategy.nftId() == 1
 
     # assert that our old strategy is empty
     updated_total_old = strategy.estimatedTotalAssets()
     assert updated_total_old == 0
 
-    # harvest to get funds back in strategy
-    chain.sleep(1)
+    # update our new strategy so it knows what our NFT id is
+    new_strategy.setGovParams(
+        "0x93A62dA5a14C80f265DAbC077fCEE437B1a0Efde",
+        "0x93A62dA5a14C80f265DAbC077fCEE437B1a0Efde",
+        0,
+        nft_id,
+        86400,
+        0,
+        {"from": gov},
+    )
+    
+    # since we sent away our NFT, we need to mint another one
+    token.transfer(new_strategy, 100e6, {"from": whale})
+    new_strategy.mintNFT({"from": gov})
     chain.mine(1)
-    new_strategy.harvest({"from": gov})
+    chain.sleep(1)
+
+    assert new_strategy.nftId() != 1
+
+    # we should already be able to see our money just fine since it's almost all in the LP
     new_strat_balance = new_strategy.estimatedTotalAssets()
+
     # confirm we made money, or at least that we have about the same
-    if is_slippery:
+    if is_slippery and no_profit:
         assert math.isclose(new_strat_balance, total_old, abs_tol=10)
     else:
         assert new_strat_balance >= total_old
@@ -78,14 +124,30 @@ def test_odds_and_ends(
     startingVault = vault.totalAssets()
     print("\nVault starting assets with new strategy: ", startingVault)
 
+    # harvest to get our NFT staked again
+    new_strategy.setDoHealthCheck(False, {"from": gov})
+    tx = new_strategy.harvest({"from": gov})
+    print("This is our harvest info after adding our new NFT:", tx.events["Harvested"])
+    chain.mine(1)
+    chain.sleep(1)
+
     # simulate one day of earnings
     chain.sleep(86400)
     chain.mine(1)
 
     # Test out our migrated strategy, confirm we're making a profit
-    new_strategy.harvest({"from": gov})
+    tx = new_strategy.harvest({"from": gov})
+    profit = tx.events["Harvested"]["profit"]
+    print("This is our harvest info:", tx.events["Harvested"])
+    assert profit > 0
     vaultAssets_2 = vault.totalAssets()
-    assert vaultAssets_2 >= startingVault
+
+    # confirm we made money, or at least that we have about the same
+    if is_slippery and no_profit:
+        assert math.isclose(vaultAssets_2, startingVault, abs_tol=10)
+    else:
+        assert vaultAssets_2 > startingVault
+
     print("\nAssets after 1 day harvest: ", vaultAssets_2)
 
     # check our oracle
@@ -113,7 +175,6 @@ def test_odds_and_ends_2(
     strategy,
     chain,
     strategist_ms,
-    pid,
     amount,
 ):
 
@@ -126,15 +187,28 @@ def test_odds_and_ends_2(
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
+    # simulate 1 day of earnings
+    chain.sleep(86400)
+    chain.mine(1)
+    chain.sleep(1)
+    
+    # make sure we don't re-lock our NFT so we can send it away
+    strategy.setManagerParams(False, False, {"from": gov})
+    strategy.harvest({"from": gov})
+    chain.mine(1)
+    chain.sleep(1)
+
     # send away all funds, will need to alter this based on strategy
-    masterchef = Contract("0x2352b745561e7e6FCD03c093cE7220e3e126ace0")
-    strategy_staked = strategy.xbooStakedInMasterchef()
-    masterchef.withdraw(pid, strategy_staked, {"from": strategy})
-    xboo = Contract("0xa48d959AE2E88f1dAA7D5F611E01908106dE7598")
-    to_send = xboo.balanceOf(strategy)
-    print("xBoo Balance of Vault", to_send)
-    xboo.transfer(gov, to_send, {"from": strategy})
+    # profits from the last harvest should still be in the vault
+    nft_contract = Contract("0xC36442b4a4522E871399CD717aBDD847Ab11FE88")
+    nft_contract.transferFrom(strategy, whale, strategy.nftId(), {"from": strategy})
+    token.transfer(whale, token.balanceOf(strategy), {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
+
+    # simulate 1 day of earnings
+    chain.sleep(86400)
+    chain.mine(1)
+    chain.sleep(1)
 
     strategy.setEmergencyExit({"from": gov})
 
@@ -145,75 +219,6 @@ def test_odds_and_ends_2(
 
     # we can also withdraw from an empty vault as well
     vault.withdraw({"from": whale})
-
-
-def test_odds_and_ends_migration(
-    StrategyFraxUniswapUSDC,
-    gov,
-    token,
-    vault,
-    guardian,
-    strategist,
-    whale,
-    strategy,
-    chain,
-    strategist_ms,
-    amount,
-):
-
-    ## deposit to the vault after approving
-    token.approve(vault, 2**256 - 1, {"from": whale})
-    vault.deposit(amount, {"from": whale})
-    chain.sleep(1)
-    strategy.harvest({"from": gov})
-    chain.sleep(1)
-
-    # deploy our new strategy
-    new_strategy = strategist.deploy(
-        StrategyFraxUniswapUSDC,
-        vault,
-    )
-    total_old = strategy.estimatedTotalAssets()
-
-    # sleep for a dau
-    chain.sleep(86400)
-
-    # migrate our old strategy
-    vault.migrateStrategy(strategy, new_strategy, {"from": gov})
-
-    # assert that our old strategy is empty
-    updated_total_old = strategy.estimatedTotalAssets()
-    assert updated_total_old == 0
-
-    # harvest to get funds back in strategy
-    chain.sleep(1)
-    new_strategy.harvest({"from": gov})
-    new_strat_balance = new_strategy.estimatedTotalAssets()
-
-    # confirm we made money, or at least that we have about the same
-    assert new_strat_balance >= total_old or math.isclose(
-        new_strat_balance, total_old, abs_tol=5
-    )
-
-    startingVault = vault.totalAssets()
-    print("\nVault starting assets with new strategy: ", startingVault)
-
-    # simulate one day of earnings
-    chain.sleep(86400)
-    chain.mine(1)
-
-    # simulate a day of waiting for share price to bump back up
-    chain.sleep(86400)
-    chain.mine(1)
-
-    # Test out our migrated strategy, confirm we're making a profit
-    new_strategy.harvest({"from": gov})
-    vaultAssets_2 = vault.totalAssets()
-    # confirm we made money, or at least that we have about the same
-    assert vaultAssets_2 >= startingVault or math.isclose(
-        vaultAssets_2, startingVault, abs_tol=5
-    )
-    print("\nAssets after 1 day harvest: ", vaultAssets_2)
 
 
 def test_odds_and_ends_liquidatePosition(
@@ -240,7 +245,6 @@ def test_odds_and_ends_liquidatePosition(
     chain.sleep(1)
     old_assets = vault.totalAssets()
     assert old_assets > 0
-    assert token.balanceOf(strategy) == 0
     assert strategy.estimatedTotalAssets() > 0
     print("\nStarting Assets: ", old_assets / 1e18)
 
@@ -270,14 +274,15 @@ def test_odds_and_ends_liquidatePosition(
     chain.mine(1)
 
     # transfer funds to our strategy so we have enough for our withdrawal
-    token.transfer(strategy, amount, {"from": whale})
+    to_transfer = amount * 1.1
+    token.transfer(strategy, to_transfer, {"from": whale})
 
     # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
     if no_profit:
         assert math.isclose(token.balanceOf(whale) + amount, startingWhale, abs_tol=10)
     else:
-        assert token.balanceOf(whale) + amount >= startingWhale
+        assert token.balanceOf(whale) + to_transfer >= startingWhale
 
 
 def test_odds_and_ends_rekt(
@@ -289,7 +294,6 @@ def test_odds_and_ends_rekt(
     strategy,
     chain,
     strategist_ms,
-    pid,
     amount,
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
@@ -301,25 +305,38 @@ def test_odds_and_ends_rekt(
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
-    # send away all funds, will need to alter this based on strategy
-    masterchef = Contract("0x2352b745561e7e6FCD03c093cE7220e3e126ace0")
-    strategy_staked = strategy.xbooStakedInMasterchef()
-    masterchef.withdraw(pid, strategy_staked, {"from": strategy})
-    xboo = Contract("0xa48d959AE2E88f1dAA7D5F611E01908106dE7598")
-    to_send = xboo.balanceOf(strategy)
-    print("xBoo Balance of Vault", to_send)
-    xboo.transfer(gov, to_send, {"from": strategy})
-    assert strategy.estimatedTotalAssets() == 0
-    assert vault.strategies(strategy)[2] == 10000
-    print("Strategy Total Debt, this should be >0:", vault.strategies(strategy)[6])
-    vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
+    # simulate 1 day of earnings
+    chain.sleep(86400)
+    chain.mine(1)
+    chain.sleep(1)
+    
+    # make sure we don't re-lock our NFT so we can send it away
+    strategy.setManagerParams(False, False, {"from": gov})
+    strategy.harvest({"from": gov})
+    chain.mine(1)
+    chain.sleep(1)
 
+    # send away all funds, will need to alter this based on strategy
+    # profits from the last harvest should still be in the vault
+    nft_contract = Contract("0xC36442b4a4522E871399CD717aBDD847Ab11FE88")
+    nft_contract.transferFrom(strategy, whale, strategy.nftId(), {"from": strategy})
+    token.transfer(whale, token.balanceOf(strategy), {"from": strategy})
+    assert strategy.estimatedTotalAssets() == 0
+
+    # simulate 1 day of earnings
+    chain.sleep(86400)
+    chain.mine(1)
+    chain.sleep(1)
+    
+    # turn off health check since we'll have a big loss, set debtRatio to 0 so we fully realize the loss
+    vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
     strategy.setDoHealthCheck(False, {"from": gov})
     chain.sleep(1)
     tx = strategy.harvest({"from": gov})
     chain.sleep(1)
 
     # we can also withdraw from an empty vault as well
+    # we don't need to set any slippage as long as we've already booked the loss with a harvest
     vault.withdraw({"from": whale})
 
 
@@ -333,7 +350,6 @@ def test_odds_and_ends_liquidate_rekt(
     strategy,
     chain,
     strategist_ms,
-    pid,
     amount,
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
@@ -345,15 +361,28 @@ def test_odds_and_ends_liquidate_rekt(
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
+    # simulate 1 day of earnings
+    chain.sleep(86400)
+    chain.mine(1)
+    chain.sleep(1)
+    
+    # make sure we don't re-lock our NFT so we can send it away
+    strategy.setManagerParams(False, False, {"from": gov})
+    strategy.harvest({"from": gov})
+    chain.mine(1)
+    chain.sleep(1)
+
     # send away all funds, will need to alter this based on strategy
-    masterchef = Contract("0x2352b745561e7e6FCD03c093cE7220e3e126ace0")
-    strategy_staked = strategy.xbooStakedInMasterchef()
-    masterchef.withdraw(pid, strategy_staked, {"from": strategy})
-    xboo = Contract("0xa48d959AE2E88f1dAA7D5F611E01908106dE7598")
-    to_send = xboo.balanceOf(strategy)
-    print("xBoo Balance of Vault", to_send)
-    xboo.transfer(gov, to_send, {"from": strategy})
+    # profits from the last harvest should still be in the vault
+    nft_contract = Contract("0xC36442b4a4522E871399CD717aBDD847Ab11FE88")
+    nft_contract.transferFrom(strategy, whale, strategy.nftId(), {"from": strategy})
+    token.transfer(whale, token.balanceOf(strategy), {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
+
+    # simulate 1 day of earnings
+    chain.sleep(86400)
+    chain.mine(1)
+    chain.sleep(1)
 
     # we can also withdraw from an empty vault as well, but make sure we're okay with losing 100%
     vault.withdraw(amount, whale, 10000, {"from": whale})
@@ -387,34 +416,3 @@ def test_weird_reverts_and_trigger(
     # can't do health check with a non-health check contract
     with brownie.reverts():
         strategy.withdraw(1e18, {"from": gov})
-
-
-# this one makes sure our harvestTrigger doesn't trigger when we don't have assets in the strategy
-def test_odds_and_ends_inactive_strat(
-    gov,
-    token,
-    vault,
-    strategist,
-    whale,
-    strategy,
-    chain,
-    strategist_ms,
-    amount,
-):
-    ## deposit to the vault after approving
-    token.approve(vault, 2**256 - 1, {"from": whale})
-    vault.deposit(amount, {"from": whale})
-    chain.sleep(1)
-    strategy.harvest({"from": gov})
-    chain.sleep(1)
-
-    ## move our funds out of the strategy
-    vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
-    # sleep for a day since univ3 is weird
-    chain.sleep(86400)
-    strategy.harvest({"from": gov})
-
-    # we shouldn't harvest empty strategies
-    tx = strategy.harvestTrigger(0, {"from": gov})
-    print("\nShould we harvest? Should be false.", tx)
-    assert tx == False

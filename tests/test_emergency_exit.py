@@ -31,9 +31,16 @@ def test_emergency_exit(
     chain.sleep(1)
 
     # set emergency and exit, then confirm that the strategy has no funds
+    chain.sleep(86400)
     strategy.setEmergencyExit({"from": gov})
+
+    # turn off healthcheck, we will have a loss on this harvest due to slippage
+    strategy.setDoHealthCheck(False, {"from": gov})
     chain.sleep(1)
-    strategy.harvest({"from": gov})
+    tx = strategy.harvest({"from": gov})
+    print("This is our harvest detail:", tx.events["Harvested"])
+    harvest_loss = tx.events["Harvested"]["loss"]
+    print("This was our harvest loss:", harvest_loss / (10 ** token.decimals()))
     chain.sleep(1)
     assert strategy.estimatedTotalAssets() == 0
 
@@ -41,12 +48,15 @@ def test_emergency_exit(
     chain.sleep(86400)
     chain.mine(1)
 
-    # withdraw and confirm our whale made money, or that we didn't lose more than dust
-    vault.withdraw({"from": whale})
-    if is_slippery and no_profit:
-        assert math.isclose(token.balanceOf(whale), startingWhale, abs_tol=10)
-    else:
-        assert token.balanceOf(whale) >= startingWhale
+    # withdraw and check on our losses (due to slippage on big swaps in/out)
+    # this loss should have already been realized on harvest, though
+    tx = vault.withdraw({"from": whale})
+    loss = startingWhale - token.balanceOf(whale)
+    print("Losses from withdrawal slippage:", loss / (10 ** token.decimals()))
+
+    # since we harvested on this loss (wasn't just a withdrawal) then we will see a decrease in share price
+    assert vault.pricePerShare() < 10 ** token.decimals()
+    print("Vault share price", vault.pricePerShare() / (10 ** token.decimals()))
 
 
 def test_emergency_exit_with_profit(
@@ -75,12 +85,17 @@ def test_emergency_exit_with_profit(
     chain.sleep(1)
 
     # set emergency and exit, then confirm that the strategy has no funds
-    donation = amount
+    donation = amount / 2
+    chain.sleep(86400)
     token.transfer(strategy, donation, {"from": whale})
     strategy.setDoHealthCheck(False, {"from": gov})
     strategy.setEmergencyExit({"from": gov})
     chain.sleep(1)
-    strategy.harvest({"from": gov})
+    tx = strategy.harvest({"from": gov})
+    print("This is our harvest detail:", tx.events["Harvested"])
+    harvest_profit = tx.events["Harvested"]["profit"]
+    print("This was our harvest profit:", harvest_profit / (10 ** token.decimals()))
+    assert harvest_profit < donation
     chain.sleep(1)
     assert strategy.estimatedTotalAssets() == 0
 
@@ -88,9 +103,17 @@ def test_emergency_exit_with_profit(
     chain.sleep(86400)
     chain.mine(1)
 
-    # withdraw and confirm we made money
-    vault.withdraw({"from": whale})
-    assert token.balanceOf(whale) + donation >= startingWhale
+    ## REALLY NEED TO THINK HERE HOW I WANT TO GET THIS PROFIT, AND ALSO IN THE NEXT TEST HOW TO SEND AWAY NFT
+
+    # withdraw and check on our losses (due to slippage on big swaps in/out)
+    # this loss should have already been realized on harvest, though
+    tx = vault.withdraw({"from": whale})
+    loss = startingWhale - token.balanceOf(whale) - donation
+    print("Losses from withdrawal slippage:", loss / (10 ** token.decimals()))
+
+    # since we harvested on this loss (wasn't just a withdrawal), but also got a big donation, we should have a profit
+    assert vault.pricePerShare() > 10 ** token.decimals()
+    print("Vault share price", vault.pricePerShare() / (10 ** token.decimals()))
 
 
 def test_emergency_exit_with_no_gain_or_loss(
@@ -101,7 +124,6 @@ def test_emergency_exit_with_no_gain_or_loss(
     strategy,
     chain,
     amount,
-    pid,
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -112,14 +134,22 @@ def test_emergency_exit_with_no_gain_or_loss(
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
+    # simulate 1 day of earnings
+    chain.sleep(86400)
+    chain.mine(1)
+    chain.sleep(1)
+    
+    # make sure we don't re-lock our NFT so we can send it away
+    strategy.setManagerParams(False, False, {"from": gov})
+    strategy.harvest({"from": gov})
+    chain.mine(1)
+    chain.sleep(1)
+
     # send away all funds, will need to alter this based on strategy
-    masterchef = Contract("0x2352b745561e7e6FCD03c093cE7220e3e126ace0")
-    strategy_staked = strategy.xbooStakedInMasterchef()
-    masterchef.withdraw(pid, strategy_staked, {"from": strategy})
-    xboo = Contract("0xa48d959AE2E88f1dAA7D5F611E01908106dE7598")
-    to_send = xboo.balanceOf(strategy)
-    print("xBoo Balance of Vault", to_send)
-    xboo.transfer(gov, to_send, {"from": strategy})
+    # profits from the last harvest should still be in the vault
+    nft_contract = Contract("0xC36442b4a4522E871399CD717aBDD847Ab11FE88")
+    nft_contract.transferFrom(strategy, whale, strategy.nftId(), {"from": strategy})
+    token.transfer(whale, token.balanceOf(strategy), {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
 
     # have our whale send in exactly our debtOutstanding
@@ -133,10 +163,6 @@ def test_emergency_exit_with_no_gain_or_loss(
     strategy.harvest({"from": gov})
     chain.sleep(1)
     assert strategy.estimatedTotalAssets() == 0
-
-    # simulate a day of waiting for share price to bump back up
-    chain.sleep(86400)
-    chain.mine(1)
 
     # withdraw and confirm we made money, accounting for all of the funds we lost lol
     vault.withdraw({"from": whale})

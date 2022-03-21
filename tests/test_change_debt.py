@@ -40,14 +40,17 @@ def test_change_debt(
     # debtRatio is in BPS (aka, max is 10,000, which represents 100%), and is a fraction of the funds that can be in the strategy
     currentDebt = 10000
     vault.updateStrategyDebtRatio(strategy, currentDebt / 2, {"from": gov})
-    
+
     # sleep for a day to make sure our NFT is unlocked
     chain.sleep(86400)
     tx = strategy.harvest({"from": gov})
     chain.sleep(1)
 
     assert strategy.estimatedTotalAssets() <= startingStrategy
-    print("\nReduced strategy assets", strategy.estimatedTotalAssets() / (10 ** token.decimals()))
+    print(
+        "\nReduced strategy assets",
+        strategy.estimatedTotalAssets() / (10 ** token.decimals()),
+    )
 
     # check on our NFT LP
     real_balance = strategy.balanceOfNFTpessimistic() / (10 ** token.decimals())
@@ -67,7 +70,10 @@ def test_change_debt(
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
-    print("\nRe-increased strategy assets", strategy.estimatedTotalAssets() / (10 ** token.decimals()))
+    print(
+        "\nRe-increased strategy assets",
+        strategy.estimatedTotalAssets() / (10 ** token.decimals()),
+    )
 
     # check on our NFT LP
     real_balance = strategy.balanceOfNFTpessimistic() / (10 ** token.decimals())

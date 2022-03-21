@@ -25,27 +25,35 @@ def test_emergency_shutdown_from_vault(
 
     # simulate one day of earnings
     chain.sleep(86400)
-
+    
+    # this is a profitable harvest
     chain.mine(1)
-    strategy.harvest({"from": gov})
-
+    tx = strategy.harvest({"from": gov})
+    profit = tx.events["Harvested"]["profit"]
+    assert profit > 0
+    
     # simulate one day of earnings
     chain.sleep(86400)
 
     # set emergency and exit, then confirm that the strategy has no funds
     vault.setEmergencyShutdown(True, {"from": gov})
     chain.sleep(1)
-    strategy.harvest({"from": gov})
+    # turn off health check since we will be taking a loss from big slippage
+    strategy.setDoHealthCheck(False, {"from": gov})
+    tx = strategy.harvest({"from": gov})
+    loss = tx.events["Harvested"]["loss"]
+    assert loss > 0
     chain.sleep(1)
     assert math.isclose(strategy.estimatedTotalAssets(), 0, abs_tol=5)
 
     # simulate a day of waiting for share price to bump back up
     chain.sleep(86400)
     chain.mine(1)
-
-    # withdraw and confirm our whale made money, or that we didn't lose more than dust
-    vault.withdraw({"from": whale})
-    if is_slippery and no_profit:
-        assert math.isclose(token.balanceOf(whale), startingWhale, abs_tol=10)
-    else:
-        assert token.balanceOf(whale) >= startingWhale
+    
+    # since we have a few profitable harvests, even though our whale burns all of his shares, treasury/strategist will still hold 20%
+    # of the profitable harvest #1, thus, share price below 0
+    tx = vault.withdraw({"from": whale})
+    loss = startingWhale - token.balanceOf(whale)
+    print("Losses from withdrawal slippage:", loss / (10 ** token.decimals()))
+    assert vault.pricePerShare() < 10 ** token.decimals()
+    print("Vault share price", vault.pricePerShare() / (10 ** token.decimals()))

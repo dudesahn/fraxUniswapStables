@@ -52,7 +52,7 @@ def test_change_debt_with_profit(
     print("\nHere's how much is in our NFT (pessimistic):", real_balance)
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
-    
+
     new_params = vault.strategies(strategy)
 
     # sleep 10 hours to increase our credit available for last assert at the bottom.

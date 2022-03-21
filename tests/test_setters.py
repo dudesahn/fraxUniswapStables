@@ -21,27 +21,6 @@ def test_setters(
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
 
-    # test our manual harvest trigger
-    strategy.setForceHarvestTriggerOnce(True, {"from": gov})
-    tx = strategy.harvestTrigger(0, {"from": gov})
-    print("\nShould we harvest? Should be true.", tx)
-    assert tx == True
-
-    strategy.setForceHarvestTriggerOnce(False, {"from": gov})
-    tx = strategy.harvestTrigger(0, {"from": gov})
-    print("\nShould we harvest? Should be false.", tx)
-    assert tx == False
-
-    # test our manual harvest trigger, and that a harvest turns it off
-    strategy.setForceHarvestTriggerOnce(True, {"from": gov})
-    tx = strategy.harvestTrigger(0, {"from": gov})
-    print("\nShould we harvest? Should be true.", tx)
-    assert tx == True
-    strategy.harvest({"from": gov})
-    tx = strategy.harvestTrigger(0, {"from": gov})
-    print("\nShould we harvest? Should be false.", tx)
-    assert tx == False
-
     # test our setters in baseStrategy and our main strategy
     strategy.setDebtThreshold(1, {"from": gov})
     strategy.setMaxReportDelay(0, {"from": gov})
@@ -93,6 +72,7 @@ def test_setters(
     # this is causing the RPC to crash now, weirdly
     # with brownie.reverts():
     # strategy.harvest({"from": gov})
+    strategy.setGovParams(strategist, strategist, 1, 1, 864000, 0, {"from": gov})
 
     # set emergency exit last
     strategy.setEmergencyExit({"from": gov})
