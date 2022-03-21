@@ -17,6 +17,7 @@ def test_withdraw_after_donation_1(
 ):
 
     ## deposit to the vault after approving
+    startingWhale = token.balanceOf(whale)
     token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
@@ -39,7 +40,7 @@ def test_withdraw_after_donation_1(
 
     # have our whale withdraw half of his donation, this ensures that we test withdrawing without pulling from the staked balance
     vault.withdraw(donation / 2, {"from": whale})
-    
+
     # try to check our true holdings to see this profit
     tx = strategy.setManagerParams(True, True, {"from": gov})
 
@@ -49,27 +50,18 @@ def test_withdraw_after_donation_1(
     harvest = strategy.harvest({"from": gov})
     new_params = vault.strategies(strategy).dict()
 
-    # sleep 10 hours to increase our credit available for last assert at the bottom.
-    chain.sleep(60 * 60 * 10)
+    # sleep so our funds unlock
+    chain.sleep(86400)
 
     profit = new_params["totalGain"] - prev_params["totalGain"]
 
-    # specifically check that our gain is greater than our donation or at least no more than 10 wei if we get slippage on deposit/withdrawal
-    if is_slippery and no_profit:
-        assert math.isclose(
-            new_params["totalGain"] - prev_params["totalGain"], donation, abs_tol=10
-        )
-    else:
-        assert new_params["totalGain"] - prev_params["totalGain"] >= donation
-        assert profit >= 0
+    # check that our gain is greater than our donation, with our preset slippage
+    slippage = strategy.slippageMax() / 10000
+    assert profit >= donation * slippage
+    assert profit >= 0
 
-    # check that we didn't add any more loss, or at least no more than 10 wei if we get slippage on deposit/withdrawal
-    if is_slippery:
-        assert math.isclose(
-            new_params["totalLoss"], prev_params["totalLoss"], abs_tol=10
-        )
-    else:
-        assert new_params["totalLoss"] == prev_params["totalLoss"]
+    # check that we didn't add more than our slippage
+    assert new_params["totalLoss"] <= vault.totalAssets() * (1 - slippage)
 
     # assert that our vault total assets, multiplied by our debtRatio, is about equal to our estimated total assets plus credit available (within 1 token)
     # we multiply this by the debtRatio of our strategy out of 10_000 total
@@ -79,6 +71,22 @@ def test_withdraw_after_donation_1(
         strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
         abs_tol=1e18,
     )
+
+    # withdraw and check on our losses (due to slippage on big swaps in/out, also our donation)
+    # even though we still have funds in strategy
+    tx = vault.withdraw({"from": whale})
+    loss = startingWhale - token.balanceOf(whale)
+    print(
+        "Losses from withdrawal slippage and donation:", loss / (10 ** token.decimals())
+    )
+    print(
+        "Vault total assets, this should be similar to the loss we experienced:",
+        vault.totalAssets() / (10 ** token.decimals()),
+    )
+
+    # since we harvested on this loss (wasn't just a withdrawal), but also got a big donation, we should have a profit
+    assert vault.pricePerShare() > 10 ** token.decimals()
+    print("Vault share price", vault.pricePerShare() / (10 ** token.decimals()))
 
 
 # lower debtRatio to 0, donate, withdraw less than the donation, then harvest
@@ -118,7 +126,7 @@ def test_withdraw_after_donation_2(
 
     # have our whale withdraw half of his donation, this ensures that we test withdrawing without pulling from the staked balance
     vault.withdraw(donation / 2, {"from": whale})
-    
+
     # try to check our true holdings to see this profit
     tx = strategy.setManagerParams(True, True, {"from": gov})
 
@@ -133,22 +141,13 @@ def test_withdraw_after_donation_2(
 
     profit = new_params["totalGain"] - prev_params["totalGain"]
 
-    # specifically check that our gain is greater than our donation or at least no more than 10 wei if we get slippage on deposit/withdrawal
-    if is_slippery and no_profit:
-        assert math.isclose(
-            new_params["totalGain"] - prev_params["totalGain"], donation, abs_tol=10
-        )
-    else:
-        assert new_params["totalGain"] - prev_params["totalGain"] >= donation
-        assert profit >= 0
+    # check that our gain is greater than our donation, with our preset slippage
+    slippage = strategy.slippageMax() / 10000
+    assert profit >= donation * slippage
+    assert profit >= 0
 
-    # check that we didn't add any more loss, or at least no more than 10 wei if we get slippage on deposit/withdrawal
-    if is_slippery:
-        assert math.isclose(
-            new_params["totalLoss"], prev_params["totalLoss"], abs_tol=10
-        )
-    else:
-        assert new_params["totalLoss"] == prev_params["totalLoss"]
+    # check that we didn't add more than our slippage
+    assert new_params["totalLoss"] <= vault.totalAssets() * (1 - slippage)
 
     # assert that our vault total assets, multiplied by our debtRatio, is about equal to our estimated total assets plus credit available (within 1 token)
     # we multiply this by the debtRatio of our strategy out of 10_000 total
@@ -196,8 +195,11 @@ def test_withdraw_after_donation_3(
     token.transfer(strategy, donation, {"from": whale})
 
     # have our whale withdraws more than his donation, ensuring we pull from strategy
-    vault.withdraw(donation + amount / 2, {"from": whale})
-    
+    # set loss parameter based on our strategy's slippage, we will lose some on slippage that is assessed on withdrawal
+    vault.withdraw(
+        donation + amount / 2, whale, strategy.slippageMax(), {"from": whale}
+    )
+
     # try to check our true holdings to see this profit
     tx = strategy.setManagerParams(True, True, {"from": gov})
 
@@ -212,22 +214,13 @@ def test_withdraw_after_donation_3(
 
     profit = new_params["totalGain"] - prev_params["totalGain"]
 
-    # specifically check that our gain is greater than our donation or at least no more than 10 wei if we get slippage on deposit/withdrawal
-    if is_slippery and no_profit:
-        assert math.isclose(
-            new_params["totalGain"] - prev_params["totalGain"], donation, abs_tol=10
-        )
-    else:
-        assert new_params["totalGain"] - prev_params["totalGain"] >= donation
-        assert profit >= 0
+    # check that our gain is greater than our donation, with our preset slippage
+    slippage = strategy.slippageMax() / 10000
+    assert profit >= donation * slippage
+    assert profit >= 0
 
-    # check that we didn't add any more loss, or at least no more than 10 wei if we get slippage on deposit/withdrawal
-    if is_slippery:
-        assert math.isclose(
-            new_params["totalLoss"], prev_params["totalLoss"], abs_tol=10
-        )
-    else:
-        assert new_params["totalLoss"] == prev_params["totalLoss"]
+    # check that we didn't add more than our slippage
+    assert new_params["totalLoss"] <= vault.totalAssets() * (1 - slippage)
 
     # assert that our vault total assets, multiplied by our debtRatio, is about equal to our estimated total assets plus credit available (within 1 token)
     # we multiply this by the debtRatio of our strategy out of 10_000 total
@@ -275,12 +268,18 @@ def test_withdraw_after_donation_4(
     token.transfer(strategy, donation, {"from": whale})
 
     # have our whale withdraws more than his donation, ensuring we pull from strategy
-    vault.withdraw(donation + amount / 2, {"from": whale})
+    # set loss parameter based on our strategy's slippage, we will lose some on slippage that is assessed on withdrawal
+    vault.withdraw(
+        donation + amount / 2, whale, strategy.slippageMax(), {"from": whale}
+    )
+
+    # try to check our true holdings to see this profit
+    tx = strategy.setManagerParams(True, True, {"from": gov})
 
     # turn off health check since we just took big profit
     strategy.setDoHealthCheck(False, {"from": gov})
     chain.sleep(1)
-    strategy.harvest({"from": gov})
+    harvest = strategy.harvest({"from": gov})
     new_params = vault.strategies(strategy).dict()
 
     # sleep 10 hours to increase our credit available for last assert at the bottom.
@@ -288,22 +287,13 @@ def test_withdraw_after_donation_4(
 
     profit = new_params["totalGain"] - prev_params["totalGain"]
 
-    # specifically check that our gain is greater than our donation or at least no more than 10 wei if we get slippage on deposit/withdrawal
-    if is_slippery and no_profit:
-        assert math.isclose(
-            new_params["totalGain"] - prev_params["totalGain"], donation, abs_tol=10
-        )
-    else:
-        assert new_params["totalGain"] - prev_params["totalGain"] >= donation
-        assert profit >= 0
+    # check that our gain is greater than our donation, with our preset slippage
+    slippage = strategy.slippageMax() / 10000
+    assert profit >= donation * slippage
+    assert profit >= 0
 
-    # check that we didn't add any more loss, or at least no more than 10 wei if we get slippage on deposit/withdrawal
-    if is_slippery:
-        assert math.isclose(
-            new_params["totalLoss"], prev_params["totalLoss"], abs_tol=10
-        )
-    else:
-        assert new_params["totalLoss"] == prev_params["totalLoss"]
+    # check that we didn't add more than our slippage
+    assert new_params["totalLoss"] <= vault.totalAssets() * (1 - slippage)
 
     # check to make sure that our debtRatio is about half of our previous debt
     assert new_params["debtRatio"] == currentDebt / 2
@@ -350,12 +340,18 @@ def test_withdraw_after_donation_5(
     chain.mine(1)
 
     # have our whale withdraws more than his donation, ensuring we pull from strategy
-    vault.withdraw(donation + amount / 2, {"from": whale})
+    # set loss parameter based on our strategy's slippage, we will lose some on slippage that is assessed on withdrawal
+    vault.withdraw(
+        donation + amount / 2, whale, strategy.slippageMax(), {"from": whale}
+    )
+
+    # try to check our true holdings to see this profit
+    tx = strategy.setManagerParams(True, True, {"from": gov})
 
     # turn off health check since we just took big profit
     strategy.setDoHealthCheck(False, {"from": gov})
     chain.sleep(1)
-    strategy.harvest({"from": gov})
+    harvest = strategy.harvest({"from": gov})
     new_params = vault.strategies(strategy).dict()
 
     # sleep 10 hours to increase our credit available for last assert at the bottom.
@@ -363,22 +359,13 @@ def test_withdraw_after_donation_5(
 
     profit = new_params["totalGain"] - prev_params["totalGain"]
 
-    # specifically check that our gain is greater than our donation or at least no more than 10 wei if we get slippage on deposit/withdrawal
-    if is_slippery and no_profit:
-        assert math.isclose(
-            new_params["totalGain"] - prev_params["totalGain"], donation, abs_tol=10
-        )
-    else:
-        assert new_params["totalGain"] - prev_params["totalGain"] >= donation
-        assert profit >= 0
+    # check that our gain is greater than our donation, with our preset slippage
+    slippage = strategy.slippageMax() / 10000
+    assert profit >= donation * slippage
+    assert profit >= 0
 
-    # check that we didn't add any more loss, or at least no more than 10 wei if we get slippage on deposit/withdrawal
-    if is_slippery:
-        assert math.isclose(
-            new_params["totalLoss"], prev_params["totalLoss"], abs_tol=10
-        )
-    else:
-        assert new_params["totalLoss"] == prev_params["totalLoss"]
+    # check that we didn't add more than our slippage
+    assert new_params["totalLoss"] <= vault.totalAssets() * (1 - slippage)
 
     # assert that our vault total assets, multiplied by our debtRatio, is about equal to our estimated total assets plus credit available (within 1 token)
     # we multiply this by the debtRatio of our strategy out of 10_000 total
@@ -424,10 +411,13 @@ def test_withdraw_after_donation_6(
     # have our whale withdraws more than his donation, ensuring we pull from strategy
     vault.withdraw(donation / 2, {"from": whale})
 
+    # try to check our true holdings to see this profit
+    tx = strategy.setManagerParams(True, True, {"from": gov})
+
     # turn off health check since we just took big profit
     strategy.setDoHealthCheck(False, {"from": gov})
     chain.sleep(1)
-    strategy.harvest({"from": gov})
+    harvest = strategy.harvest({"from": gov})
     new_params = vault.strategies(strategy).dict()
 
     # sleep 10 hours to increase our credit available for last assert at the bottom.
@@ -435,22 +425,13 @@ def test_withdraw_after_donation_6(
 
     profit = new_params["totalGain"] - prev_params["totalGain"]
 
-    # specifically check that our gain is greater than our donation or at least no more than 10 wei if we get slippage on deposit/withdrawal
-    if is_slippery and no_profit:
-        assert math.isclose(
-            new_params["totalGain"] - prev_params["totalGain"], donation, abs_tol=10
-        )
-    else:
-        assert new_params["totalGain"] - prev_params["totalGain"] >= donation
-        assert profit >= 0
+    # check that our gain is greater than our donation, with our preset slippage
+    slippage = strategy.slippageMax() / 10000
+    assert profit >= donation * slippage
+    assert profit >= 0
 
-    # check that we didn't add any more loss, or at least no more than 10 wei if we get slippage on deposit/withdrawal
-    if is_slippery:
-        assert math.isclose(
-            new_params["totalLoss"], prev_params["totalLoss"], abs_tol=10
-        )
-    else:
-        assert new_params["totalLoss"] == prev_params["totalLoss"]
+    # check that we didn't add more than our slippage
+    assert new_params["totalLoss"] <= vault.totalAssets() * (1 - slippage)
 
     # assert that our vault total assets, multiplied by our debtRatio, is about equal to our estimated total assets plus credit available (within 1 token)
     # we multiply this by the debtRatio of our strategy out of 10_000 total
@@ -486,10 +467,6 @@ def test_withdraw_after_donation_7(
     prev_params = vault.strategies(strategy).dict()
     prev_assets = vault.totalAssets()
 
-    currentDebt = vault.strategies(strategy)["debtRatio"]
-    vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
-    assert vault.strategies(strategy)["debtRatio"] == 0
-
     # simulate one day of earnings
     chain.sleep(86400)
     chain.mine(1)
@@ -499,28 +476,29 @@ def test_withdraw_after_donation_7(
     token.transfer(strategy, donation, {"from": whale})
 
     # have our whale withdraws more than his donation, ensuring we pull from strategy
+    # set 1% loss parameter, we will lose some on slippage that is assessed on withdrawal
     withdrawal = donation + amount / 2
-    vault.withdraw(withdrawal, {"from": whale})
+    vault.withdraw(withdrawal, whale, 100, {"from": whale})
 
-    # We harvest twice to take profits and then to send the funds to our strategy. This is for our last check below.
-    chain.sleep(1)
+    # try to check our true holdings to see this profit
+    # if we're going to do this method, then we need to set emergencyExit to make sure we get everything out
+    tx = strategy.setManagerParams(True, True, {"from": gov})
+    strategy.setEmergencyExit({"from": gov})
 
     # turn off health check since we just took big profit
     strategy.setDoHealthCheck(False, {"from": gov})
-    strategy.harvest({"from": gov})
+    chain.sleep(1)
+    harvest = strategy.harvest({"from": gov})
+    new_params = vault.strategies(strategy).dict()
 
     # check everywhere to make sure we emptied out the strategy
     assert strategy.estimatedTotalAssets() == 0
     assert token.balanceOf(strategy) == 0
     current_assets = vault.totalAssets()
 
-    # assert that our total assets have gone up or stayed the same when accounting for the donation and withdrawal, or that we're close if we have no yield and a funky token
-    if is_slippery and no_profit:
-        assert math.isclose(
-            donation - withdrawal + prev_assets, current_assets, abs_tol=10
-        )
-    else:
-        assert current_assets >= donation - withdrawal + prev_assets
+    # assert that our total assets have gone up or stayed the same when accounting for the donation and withdrawal, and our preset slippage
+    slippage = strategy.slippageMax() / 10000
+    assert current_assets >= (donation * slippage) - withdrawal + prev_assets
 
     new_params = vault.strategies(strategy).dict()
 
@@ -534,25 +512,15 @@ def test_withdraw_after_donation_7(
 
     profit = new_params["totalGain"] - prev_params["totalGain"]
 
-    # specifically check that our gain is greater than our donation or at least no more than 10 wei if we get slippage on deposit/withdrawal
-    if is_slippery and no_profit:
-        assert math.isclose(
-            new_params["totalGain"] - prev_params["totalGain"], donation, abs_tol=10
-        )
-    else:
-        assert new_params["totalGain"] - prev_params["totalGain"] >= donation
-        assert profit >= 0
+    # check that our gain is greater than our donation, with 1% for slippage
+    assert profit >= donation * 0.99  # assume ~1% slippage or less
+    assert profit >= 0
 
-    # check that we didn't add any more loss, or at least no more than 10 wei if we get slippage on deposit/withdrawal
-    if is_slippery:
-        assert math.isclose(
-            new_params["totalLoss"], prev_params["totalLoss"], abs_tol=10
-        )
-    else:
-        assert new_params["totalLoss"] == prev_params["totalLoss"]
+    # check that we didn't add more than 1% loss
+    assert new_params["totalLoss"] <= vault.totalAssets() * 1.01
 
 
-# lower debtRatio to 0, donate, withdraw more than the donation, then harvest
+# lower debtRatio to 0, donate, withdraw less than the donation, then harvest
 def test_withdraw_after_donation_8(
     gov,
     token,
@@ -576,10 +544,6 @@ def test_withdraw_after_donation_8(
     prev_params = vault.strategies(strategy).dict()
     prev_assets = vault.totalAssets()
 
-    currentDebt = vault.strategies(strategy)["debtRatio"]
-    vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
-    assert vault.strategies(strategy)["debtRatio"] == 0
-
     # simulate one day of earnings
     chain.sleep(86400)
     chain.mine(1)
@@ -588,29 +552,29 @@ def test_withdraw_after_donation_8(
     donation = amount / 2
     token.transfer(strategy, donation, {"from": whale})
 
-    # have our whale withdraws more than his donation, ensuring we pull from strategy
+    # have our whale withdraws less than his donation
     withdrawal = donation / 2
     vault.withdraw(withdrawal, {"from": whale})
 
-    # We harvest twice to take profits and then to send the funds to our strategy. This is for our last check below.
-    chain.sleep(1)
+    # try to check our true holdings to see this profit
+    # if we're going to do this method, then we need to set emergencyExit to make sure we get everything out
+    tx = strategy.setManagerParams(True, True, {"from": gov})
+    strategy.setEmergencyExit({"from": gov})
 
     # turn off health check since we just took big profit
     strategy.setDoHealthCheck(False, {"from": gov})
-    strategy.harvest({"from": gov})
+    chain.sleep(1)
+    harvest = strategy.harvest({"from": gov})
+    new_params = vault.strategies(strategy).dict()
 
     # check everywhere to make sure we emptied out the strategy
     assert strategy.estimatedTotalAssets() == 0
     assert token.balanceOf(strategy) == 0
     current_assets = vault.totalAssets()
 
-    # assert that our total assets have gone up or stayed the same when accounting for the donation and withdrawal, or that we're close if we have no yield and a funky token
-    if is_slippery and no_profit:
-        assert math.isclose(
-            donation - withdrawal + prev_assets, current_assets, abs_tol=10
-        )
-    else:
-        assert current_assets >= donation - withdrawal + prev_assets
+    # assert that our total assets have gone up or stayed the same when accounting for the donation and withdrawal, and our preset slippage
+    slippage = strategy.slippageMax() / 10000
+    assert current_assets >= (donation * slippage) - withdrawal + prev_assets
 
     new_params = vault.strategies(strategy).dict()
 
@@ -624,19 +588,9 @@ def test_withdraw_after_donation_8(
 
     profit = new_params["totalGain"] - prev_params["totalGain"]
 
-    # specifically check that our gain is greater than our donation or at least no more than 10 wei if we get slippage on deposit/withdrawal
-    if is_slippery and no_profit:
-        assert math.isclose(
-            new_params["totalGain"] - prev_params["totalGain"], donation, abs_tol=10
-        )
-    else:
-        assert new_params["totalGain"] - prev_params["totalGain"] >= donation
-        assert profit >= 0
+    # check that our gain is greater than our donation, with 1% for slippage
+    assert profit >= donation * 0.99  # assume ~1% slippage or less
+    assert profit >= 0
 
-    # check that we didn't add any more loss, or at least no more than 10 wei if we get slippage on deposit/withdrawal
-    if is_slippery:
-        assert math.isclose(
-            new_params["totalLoss"], prev_params["totalLoss"], abs_tol=10
-        )
-    else:
-        assert new_params["totalLoss"] == prev_params["totalLoss"]
+    # check that we didn't add more than 1% loss
+    assert new_params["totalLoss"] <= vault.totalAssets() * 1.01

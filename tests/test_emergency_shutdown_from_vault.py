@@ -25,13 +25,13 @@ def test_emergency_shutdown_from_vault(
 
     # simulate one day of earnings
     chain.sleep(86400)
-    
+
     # this is a profitable harvest
     chain.mine(1)
     tx = strategy.harvest({"from": gov})
     profit = tx.events["Harvested"]["profit"]
     assert profit > 0
-    
+
     # simulate one day of earnings
     chain.sleep(86400)
 
@@ -49,9 +49,10 @@ def test_emergency_shutdown_from_vault(
     # simulate a day of waiting for share price to bump back up
     chain.sleep(86400)
     chain.mine(1)
-    
+
     # since we have a few profitable harvests, even though our whale burns all of his shares, treasury/strategist will still hold 20%
     # of the profitable harvest #1, thus, share price below 0
+    # this loss should have already been realized on harvest, and we removed all funds from strategy so no more slippage.
     tx = vault.withdraw({"from": whale})
     loss = startingWhale - token.balanceOf(whale)
     print("Losses from withdrawal slippage:", loss / (10 ** token.decimals()))

@@ -83,7 +83,7 @@ def other_vault_strategy():
 
 
 @pytest.fixture(scope="module")
-def farmed(): # ALCX
+def farmed():  # ALCX
     yield Contract("0xdBdb4d16EdA451D0503b854CF79D55697F90c8DF")
 
 
@@ -196,7 +196,7 @@ def strategy(
     vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
     strategy.setHealthCheck(healthCheck, {"from": gov})
     strategy.setDoHealthCheck(True, {"from": gov})
-    
+
     ## don't worry about gas prices
     gas_oracle.setMaxAcceptableBaseFee(20000 * 1e9, {"from": strategist_ms})
 

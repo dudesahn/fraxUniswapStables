@@ -33,7 +33,7 @@ def test_odds_and_ends(
     chain.sleep(86400)
     chain.mine(1)
     chain.sleep(1)
-    
+
     # make sure we don't re-lock our NFT so we can send it away
     strategy.setManagerParams(False, False, {"from": gov})
     strategy.harvest({"from": gov})
@@ -46,9 +46,17 @@ def test_odds_and_ends(
     nft_contract.transferFrom(strategy, whale, strategy.nftId(), {"from": strategy})
     token.transfer(whale, token.balanceOf(strategy), {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
-    
+
     # reset our nftID to 1 since we sent away our NFT
-    strategy.setGovParams(strategy.refer(), strategy.voter(), 0, 1, 86400, strategy.nftUnlockTime(), {"from": gov})
+    strategy.setGovParams(
+        strategy.refer(),
+        strategy.voter(),
+        0,
+        1,
+        86400,
+        strategy.nftUnlockTime(),
+        {"from": gov},
+    )
 
     # simulate 1 day of earnings
     chain.sleep(86400)
@@ -62,7 +70,7 @@ def test_odds_and_ends(
 
     # we can also withdraw from an empty vault as well, but make sure we're okay with taking a loss
     vault.withdraw(amount, whale, 10000, {"from": whale})
-    
+
     # we can try migrating too!
     # deploy our new strategy
     new_strategy = strategist.deploy(
@@ -82,7 +90,7 @@ def test_odds_and_ends(
     vault.migrateStrategy(strategy, new_strategy, {"from": gov})
     new_strategy.setHealthCheck(healthCheck, {"from": gov})
     new_strategy.setDoHealthCheck(True, {"from": gov})
-    
+
     # update our debtRatio, the big withdrawal and loss previously reduced the debtRatio on the old strategy
     vault.updateStrategyDebtRatio(new_strategy, 10000, {"from": gov})
 
@@ -103,7 +111,7 @@ def test_odds_and_ends(
         0,
         {"from": gov},
     )
-    
+
     # since we sent away our NFT, we need to mint another one
     token.transfer(new_strategy, 100e6, {"from": whale})
     new_strategy.mintNFT({"from": gov})
@@ -191,7 +199,7 @@ def test_odds_and_ends_2(
     chain.sleep(86400)
     chain.mine(1)
     chain.sleep(1)
-    
+
     # make sure we don't re-lock our NFT so we can send it away
     strategy.setManagerParams(False, False, {"from": gov})
     strategy.harvest({"from": gov})
@@ -309,7 +317,7 @@ def test_odds_and_ends_rekt(
     chain.sleep(86400)
     chain.mine(1)
     chain.sleep(1)
-    
+
     # make sure we don't re-lock our NFT so we can send it away
     strategy.setManagerParams(False, False, {"from": gov})
     strategy.harvest({"from": gov})
@@ -327,7 +335,7 @@ def test_odds_and_ends_rekt(
     chain.sleep(86400)
     chain.mine(1)
     chain.sleep(1)
-    
+
     # turn off health check since we'll have a big loss, set debtRatio to 0 so we fully realize the loss
     vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -365,7 +373,7 @@ def test_odds_and_ends_liquidate_rekt(
     chain.sleep(86400)
     chain.mine(1)
     chain.sleep(1)
-    
+
     # make sure we don't re-lock our NFT so we can send it away
     strategy.setManagerParams(False, False, {"from": gov})
     strategy.harvest({"from": gov})

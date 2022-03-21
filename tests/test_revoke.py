@@ -30,7 +30,7 @@ def test_revoke_strategy_from_vault(
     vault_holdings_starting = token.balanceOf(vault)
     strategy_starting = strategy.estimatedTotalAssets()
     vault.revokeStrategy(strategy.address, {"from": gov})
-    
+
     # turn off health check since we will be taking a loss
     chain.sleep(1)
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -38,7 +38,7 @@ def test_revoke_strategy_from_vault(
     print("This is our harvest info after revoking:", harvest.events["Harvested"])
     chain.sleep(1)
     vaultAssets_after_revoke = vault.totalAssets()
-    
+
     # our share price should be below 1 since we took a loss only
     assert vault.pricePerShare() < 10 ** token.decimals()
     print("Vault share price", vault.pricePerShare() / (10 ** token.decimals()))

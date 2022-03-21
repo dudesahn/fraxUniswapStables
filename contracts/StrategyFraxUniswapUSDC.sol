@@ -264,7 +264,25 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         _profit = afterStableBalance.sub(beforeStableBalance);
         _debtPayment = _debtOutstanding;
 
-        // we need to free up all of our profit as USDC, so will need more since some is in FRAX currently
+        // use this to check our profit/loss if we suspect the pool is imbalanced in one way or the other, or if we get donations
+        if (checkTrueHoldings) {
+            uint256 assets = estimatedTotalAssets();
+            uint256 debt = vault.strategies(address(this)).totalDebt;
+            // if assets are greater than debt, things are working great!
+            if (assets > debt) {
+                _profit = assets.sub(debt);
+            }
+            // Losses should never happen unless FRAX depegs, but if it does, let's record it accurately.
+            else {
+                _loss = debt.sub(assets);
+                _profit = 0;
+            }
+        } else {
+            // check our peg to make sure everything is okay
+            checkFraxPeg();
+        }
+
+        // we need to free up all of our profit as USDC, so will need more since some is likely in FRAX currently
         uint256 toFree = _debtPayment.add(_profit);
 
         // this will pretty much always be true unless we stop getting FRAX profits
@@ -284,30 +302,6 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
                 _profit = 0;
                 _loss = _debtOutstanding.sub(_debtPayment);
             }
-        }
-
-        // use this to check our profit/loss if we suspect the pool is imbalanced in one way or the other, or if we get donations
-        if (checkTrueHoldings) {
-            uint256 assets = estimatedTotalAssets();
-            uint256 debt = vault.strategies(address(this)).totalDebt;
-            // if assets are greater than debt, things are working great!
-            if (assets > debt) {
-                _profit = assets.sub(debt);
-                // we need to prove to the vault that we have enough want to cover our profit and debt payment
-                if (wantBal < _profit.add(_debtPayment)) {
-                    uint256 amountToFree =
-                        _profit.add(_debtPayment).sub(wantBal);
-                    _withdrawSome(amountToFree);
-                }
-            }
-            // Losses should never happen unless FRAX depegs, but if it does, let's record it accurately.
-            else {
-                _loss = debt.sub(assets);
-                _profit = 0;
-            }
-        } else {
-            // check our peg to make sure everything is okay
-            checkFraxPeg();
         }
 
         // we're done harvesting, so reset our trigger if we used it

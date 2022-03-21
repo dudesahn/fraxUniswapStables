@@ -49,7 +49,7 @@ def test_emergency_exit(
     chain.mine(1)
 
     # withdraw and check on our losses (due to slippage on big swaps in/out)
-    # this loss should have already been realized on harvest, though
+    # this loss should have already been realized on harvest, though, and we removed all funds from strategy so no more slippage.
     tx = vault.withdraw({"from": whale})
     loss = startingWhale - token.balanceOf(whale)
     print("Losses from withdrawal slippage:", loss / (10 ** token.decimals()))
@@ -103,10 +103,8 @@ def test_emergency_exit_with_profit(
     chain.sleep(86400)
     chain.mine(1)
 
-    ## REALLY NEED TO THINK HERE HOW I WANT TO GET THIS PROFIT, AND ALSO IN THE NEXT TEST HOW TO SEND AWAY NFT
-
     # withdraw and check on our losses (due to slippage on big swaps in/out)
-    # this loss should have already been realized on harvest, though
+    # this loss should have already been realized on harvest, though, and we removed all funds from strategy so no more slippage.
     tx = vault.withdraw({"from": whale})
     loss = startingWhale - token.balanceOf(whale) - donation
     print("Losses from withdrawal slippage:", loss / (10 ** token.decimals()))
@@ -138,7 +136,7 @@ def test_emergency_exit_with_no_gain_or_loss(
     chain.sleep(86400)
     chain.mine(1)
     chain.sleep(1)
-    
+
     # make sure we don't re-lock our NFT so we can send it away
     strategy.setManagerParams(False, False, {"from": gov})
     strategy.harvest({"from": gov})
