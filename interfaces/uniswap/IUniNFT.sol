@@ -23,7 +23,7 @@ interface IUniNFT {
         view
         returns (uint256[] memory amounts);
 
-     struct nftStruct {
+    struct nftStruct {
         address token0;
         address token1;
         uint24 fee;
@@ -37,27 +37,33 @@ interface IUniNFT {
         uint256 deadline;
     }
 
-    function mint(nftStruct calldata params) external payable returns(
-        uint256 token_id,
-        uint128 liquidity,
-        uint256 amount0,
-        uint256 amount1)
-        ;
+    function mint(nftStruct calldata params)
+        external
+        payable
+        returns (
+            uint256 token_id,
+            uint128 liquidity,
+            uint256 amount0,
+            uint256 amount1
+        );
 
-    function positions(uint256 tokenId) external view returns (
-        uint96 nonce,
-        address operator,
-        address token0,
-        address token1,
-        uint24 fee,
-        int24 tickLower,
-        int24 tickUpper,
-        uint128 liquidity,
-        uint256 feeGrowthInside0LastX128,
-        uint256 feeGrowthInside1LastX128,
-        uint128 tokensOwed0,
-        uint128 tokensOwed1);
-
+    function positions(uint256 tokenId)
+        external
+        view
+        returns (
+            uint96 nonce,
+            address operator,
+            address token0,
+            address token1,
+            uint24 fee,
+            int24 tickLower,
+            int24 tickUpper,
+            uint128 liquidity,
+            uint256 feeGrowthInside0LastX128,
+            uint256 feeGrowthInside1LastX128,
+            uint128 tokensOwed0,
+            uint128 tokensOwed1
+        );
 
     struct decreaseStruct {
         uint256 token_id;
@@ -67,10 +73,12 @@ interface IUniNFT {
         uint256 deadline;
     }
 
-    function decreaseLiquidity(decreaseStruct calldata params) external payable returns(
-        uint256 amount0,
-        uint256 amount1)
-    ;
+    function balanceOf(address owner) external view returns (uint256 balance);
+
+    function decreaseLiquidity(decreaseStruct calldata params)
+        external
+        payable
+        returns (uint256 amount0, uint256 amount1);
 
     struct collectStruct {
         uint256 token_id;
@@ -79,10 +87,10 @@ interface IUniNFT {
         uint128 amount1Max;
     }
 
-    function collect(collectStruct calldata params) external payable returns(
-        uint256 amount0,
-        uint256 amount1
-    );
+    function collect(collectStruct calldata params)
+        external
+        payable
+        returns (uint256 amount0, uint256 amount1);
 
     struct increaseStruct {
         uint256 token_id;
@@ -93,12 +101,14 @@ interface IUniNFT {
         uint256 deadline;
     }
 
-    function increaseLiquidity(increaseStruct calldata params) external payable returns (
+    function increaseLiquidity(increaseStruct calldata params)
+        external
+        payable
+        returns (
             uint128 liquidity,
             uint256 amount0,
             uint256 amount1
         );
 
-    function ownerOf(uint256 tokenID) external view returns(address);
-
+    function ownerOf(uint256 tokenID) external view returns (address);
 }
