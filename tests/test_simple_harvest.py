@@ -37,6 +37,12 @@ def test_simple_harvest(
     print("\nHere's how much is in our NFT (pessimistic):", real_balance)
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
+    print(
+        "\nDust left in strategy\nUSDC:",
+        strategy.balanceOfWant() / (10 ** token.decimals()),
+        "\nFRAX:",
+        strategy.fraxBalance() / 1e18,
+    )
 
     strategy.harvest({"from": gov})
     chain.sleep(1)
@@ -49,6 +55,12 @@ def test_simple_harvest(
     print("\nHere's how much is in our NFT (pessimistic):", real_balance)
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
+    print(
+        "\nDust left in strategy\nUSDC:",
+        strategy.balanceOfWant() / (10 ** token.decimals()),
+        "\nFRAX:",
+        strategy.fraxBalance() / 1e18,
+    )
 
     old_assets = vault.totalAssets()
     assert old_assets > 0
@@ -66,13 +78,8 @@ def test_simple_harvest(
     chain.sleep(1)
     new_assets = vault.totalAssets()
     # confirm we made money, or at least that we have about the same
-    if no_profit:
-        assert math.isclose(new_assets, old_assets, abs_tol=10)
-    else:
-        assert new_assets >= old_assets
-    print(
-        "\nVault total assets after 1 harvest: ", new_assets / (10 ** token.decimals())
-    )
+    assert new_assets >= old_assets
+    print("\nVault total assets after harvest: ", new_assets / (10 ** token.decimals()))
 
     # check on our NFT LP
     real_balance = strategy.balanceOfNFTpessimistic() / (10 ** token.decimals())
@@ -81,6 +88,12 @@ def test_simple_harvest(
     print("\nHere's how much is in our NFT (pessimistic):", real_balance)
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
+    print(
+        "\nDust left in strategy\nUSDC:",
+        strategy.balanceOfWant() / (10 ** token.decimals()),
+        "\nFRAX:",
+        strategy.fraxBalance() / 1e18,
+    )
 
     # Display estimated APR
     print(
@@ -89,10 +102,65 @@ def test_simple_harvest(
             ((new_assets - old_assets) * (365)) / (strategy.estimatedTotalAssets())
         ),
     )
-
-    # simulate 1 day of earnings so our LP will unlock
-    chain.mine(1)
+    # simulate one day, since that's how long we lock for
     chain.sleep(86400)
+    chain.mine(1)
+
+    # harvest, store new asset amount
+    chain.sleep(1)
+    harvest = strategy.harvest({"from": gov})
+    print("The is our harvest info:", harvest.events["Harvested"])
+    chain.sleep(1)
+    new_assets = vault.totalAssets()
+    # confirm we made money, or at least that we have about the same
+    assert new_assets >= old_assets
+    print("\nVault total assets after harvest: ", new_assets / (10 ** token.decimals()))
+
+    # check on our NFT LP
+    real_balance = strategy.balanceOfNFTpessimistic() / (10 ** token.decimals())
+    virtual_balance = strategy.balanceOfNFToptimistic() / (10 ** token.decimals())
+    slippage = (virtual_balance - real_balance) / real_balance
+    print("\nHere's how much is in our NFT (pessimistic):", real_balance)
+    print("Here's how much is in our NFT (optimistic):", virtual_balance)
+    print("This is our slippage:", "{:.4%}".format(slippage))
+    print(
+        "\nDust left in strategy\nUSDC:",
+        strategy.balanceOfWant() / (10 ** token.decimals()),
+        "\nFRAX:",
+        strategy.fraxBalance() / 1e18,
+    )
+
+    # simulate one day, since that's how long we lock for
+    chain.sleep(86400)
+    chain.mine(1)
+
+    # harvest, store new asset amount
+    chain.sleep(1)
+    harvest = strategy.harvest({"from": gov})
+    print("The is our harvest info:", harvest.events["Harvested"])
+    chain.sleep(1)
+    new_assets = vault.totalAssets()
+    # confirm we made money, or at least that we have about the same
+    assert new_assets >= old_assets
+    print("\nVault total assets after harvest: ", new_assets / (10 ** token.decimals()))
+
+    # check on our NFT LP
+    real_balance = strategy.balanceOfNFTpessimistic() / (10 ** token.decimals())
+    virtual_balance = strategy.balanceOfNFToptimistic() / (10 ** token.decimals())
+    slippage = (virtual_balance - real_balance) / real_balance
+    print("\nHere's how much is in our NFT (pessimistic):", real_balance)
+    print("Here's how much is in our NFT (optimistic):", virtual_balance)
+    print("This is our slippage:", "{:.4%}".format(slippage))
+    print(
+        "\nDust left in strategy\nUSDC:",
+        strategy.balanceOfWant() / (10 ** token.decimals()),
+        "\nFRAX:",
+        strategy.fraxBalance() / 1e18,
+    )
+
+    # simulate one day, since that's how long we lock for
+    chain.sleep(86400)
+    chain.mine(1)
 
     # turn off auto-restake since we want to withdraw after this harvest
     strategy.setManagerParams(False, False, {"from": gov})
@@ -144,6 +212,11 @@ def test_simple_harvest_with_uni_fees(
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
 
+    # check how much liquidity we have staked in the frax contract
+    staking = Contract("0x3EF26504dbc8Dd7B7aa3E97Bc9f3813a9FC0B4B0")
+    locked = staking.lockedLiquidityOf(strategy)
+    print("\nStrategy locked liquidity:", locked)
+
     strategy.harvest({"from": gov})
     chain.sleep(1)  # we currently lock for a day
     chain.mine(1)
@@ -156,6 +229,11 @@ def test_simple_harvest_with_uni_fees(
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
 
+    # check how much liquidity we have staked in the frax contract
+    staking = Contract("0x3EF26504dbc8Dd7B7aa3E97Bc9f3813a9FC0B4B0")
+    locked = staking.lockedLiquidityOf(strategy)
+    print("\nStrategy locked liquidity:", locked)
+
     # have our whale trade in the uniV3 pool a bunch to generate some fees
     uni_values_token = [token.address, 500, frax.address]
     uni_values_frax = [frax.address, 500, token.address]
@@ -166,10 +244,11 @@ def test_simple_harvest_with_uni_fees(
     token.approve(uni_router, 2**256 - 1, {"from": whale})
     frax.approve(uni_router, 2**256 - 1, {"from": whale})
     print("\nLet's do some trading!")
+    to_swap = (
+        token.balanceOf(whale) / 15
+    )  # whale has like $200m USDC, we don't need to do that lol
+    # note that if we do enough, we will drain all FRAX, and then won't get any more rewards from the staking pool
     for i in range(3):
-        to_swap = (
-            token.balanceOf(whale) / 5
-        )  # whale has like $200m USDC, we don't need to do that lol
         exact_input = (packed_path_token, whale.address, 2**256 - 1, to_swap, 1)
         uni_router.exactInput(exact_input, {"from": whale})
         chain.sleep(1)
@@ -191,6 +270,11 @@ def test_simple_harvest_with_uni_fees(
     print("\nHere's how much is in our NFT (pessimistic):", real_balance)
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
+
+    # check how much liquidity we have staked in the frax contract
+    staking = Contract("0x3EF26504dbc8Dd7B7aa3E97Bc9f3813a9FC0B4B0")
+    locked = staking.lockedLiquidityOf(strategy)
+    print("\nStrategy locked liquidity:", locked)
 
     old_assets = vault.totalAssets()
     assert old_assets > 0
@@ -222,6 +306,11 @@ def test_simple_harvest_with_uni_fees(
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
 
+    # check how much liquidity we have staked in the frax contract
+    staking = Contract("0x3EF26504dbc8Dd7B7aa3E97Bc9f3813a9FC0B4B0")
+    locked = staking.lockedLiquidityOf(strategy)
+    print("\nStrategy locked liquidity:", locked)
+
     # Display estimated APR
     print(
         "\nEstimated APR with trading fees: ",
@@ -246,6 +335,11 @@ def test_simple_harvest_with_uni_fees(
     print("\nHere's how much is in our NFT (pessimistic):", real_balance)
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
+
+    # check how much liquidity we have staked in the frax contract
+    staking = Contract("0x3EF26504dbc8Dd7B7aa3E97Bc9f3813a9FC0B4B0")
+    locked = staking.lockedLiquidityOf(strategy)
+    print("\nStrategy locked liquidity:", locked)
 
     # simulate 1 day for share price to rise
     chain.sleep(86400)
@@ -293,6 +387,11 @@ def test_simple_harvest_imbalanced_pool(
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
 
+    # check how much liquidity we have staked in the frax contract
+    staking = Contract("0x3EF26504dbc8Dd7B7aa3E97Bc9f3813a9FC0B4B0")
+    locked = staking.lockedLiquidityOf(strategy)
+    print("\nStrategy locked liquidity:", locked)
+
     strategy.harvest({"from": gov})
     chain.sleep(1)  # we currently lock for a day
     chain.mine(1)
@@ -305,6 +404,11 @@ def test_simple_harvest_imbalanced_pool(
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
 
+    # check how much liquidity we have staked in the frax contract
+    staking = Contract("0x3EF26504dbc8Dd7B7aa3E97Bc9f3813a9FC0B4B0")
+    locked = staking.lockedLiquidityOf(strategy)
+    print("\nStrategy locked liquidity:", locked)
+
     # have our whale trade in the uniV3 pool a bunch to generate some fees
     uni_values_token = [token.address, 500, frax.address]
     uni_values_frax = [frax.address, 500, token.address]
@@ -316,9 +420,10 @@ def test_simple_harvest_imbalanced_pool(
     frax.approve(uni_router, 2**256 - 1, {"from": whale})
     print("\nLet's do some trading!")
     to_swap = (
-        token.balanceOf(whale) / 5
+        token.balanceOf(whale) / 15
     )  # whale has like $200m USDC, we don't need to do that lol
-    for i in range(2):
+    # note that if we do enough, we will drain all FRAX, and then won't get any more rewards from the staking pool
+    for i in range(3):
         exact_input = (packed_path_token, whale.address, 2**256 - 1, to_swap, 1)
         uni_router.exactInput(exact_input, {"from": whale})
         chain.sleep(1)
@@ -328,6 +433,14 @@ def test_simple_harvest_imbalanced_pool(
     tradingLosses = newWhale - token.balanceOf(whale)
     print("USDC lost trading", tradingLosses / (10 ** token.decimals()))
 
+    nft_holdings = strategy.principal()
+    print(
+        "\nCurrent NFT Holdings after trading\nFRAX:",
+        nft_holdings[0] / 1e18,
+        "\nUSDC:",
+        nft_holdings[1] / 1e6,
+    )
+
     # check on our NFT LP
     real_balance = strategy.balanceOfNFTpessimistic() / (10 ** token.decimals())
     virtual_balance = strategy.balanceOfNFToptimistic() / (10 ** token.decimals())
@@ -336,10 +449,19 @@ def test_simple_harvest_imbalanced_pool(
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
 
+    # check how much liquidity we have staked in the frax contract
+    staking = Contract("0x3EF26504dbc8Dd7B7aa3E97Bc9f3813a9FC0B4B0")
+    locked = staking.lockedLiquidityOf(strategy)
+    print("\nStrategy locked liquidity:", locked)
+
     old_assets = vault.totalAssets()
     assert old_assets > 0
     assert strategy.estimatedTotalAssets() > 0
     print("\nStarting vault total assets: ", old_assets / (10 ** token.decimals()))
+    print(
+        "Strategy total assets:",
+        strategy.estimatedTotalAssets() / (10 ** token.decimals()),
+    )
 
     # simulate one day, since that's how long we lock for
     chain.sleep(86400)
@@ -357,6 +479,10 @@ def test_simple_harvest_imbalanced_pool(
     else:
         assert new_assets >= old_assets
     print("\nVault total assets after harvest: ", new_assets / (10 ** token.decimals()))
+    print(
+        "Strategy total assets:",
+        strategy.estimatedTotalAssets() / (10 ** token.decimals()),
+    )
 
     # check on our NFT LP
     real_balance = strategy.balanceOfNFTpessimistic() / (10 ** token.decimals())
@@ -365,6 +491,11 @@ def test_simple_harvest_imbalanced_pool(
     print("\nHere's how much is in our NFT (pessimistic):", real_balance)
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
+
+    # check how much liquidity we have staked in the frax contract
+    staking = Contract("0x3EF26504dbc8Dd7B7aa3E97Bc9f3813a9FC0B4B0")
+    locked = staking.lockedLiquidityOf(strategy)
+    print("\nStrategy locked liquidity:", locked)
 
     # Display estimated APR
     print(
@@ -383,6 +514,15 @@ def test_simple_harvest_imbalanced_pool(
     harvest = strategy.harvest({"from": gov})
     print("\nThe is our harvest info:", harvest.events["Harvested"])
 
+    print(
+        "\nVault total assets after final harvest: ",
+        new_assets / (10 ** token.decimals()),
+    )
+    print(
+        "Strategy total assets:",
+        strategy.estimatedTotalAssets() / (10 ** token.decimals()),
+    )
+
     # check on our NFT LP
     real_balance = strategy.balanceOfNFTpessimistic() / (10 ** token.decimals())
     virtual_balance = strategy.balanceOfNFToptimistic() / (10 ** token.decimals())
@@ -390,6 +530,11 @@ def test_simple_harvest_imbalanced_pool(
     print("\nHere's how much is in our NFT (pessimistic):", real_balance)
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
+
+    # check how much liquidity we have staked in the frax contract
+    staking = Contract("0x3EF26504dbc8Dd7B7aa3E97Bc9f3813a9FC0B4B0")
+    locked = staking.lockedLiquidityOf(strategy)
+    print("\nStrategy locked liquidity:", locked)
 
     # simulate 1 day for share price to rise
     chain.sleep(86400)
@@ -437,6 +582,11 @@ def test_simple_harvest_imbalanced_pool_check_holdings(
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
 
+    # check how much liquidity we have staked in the frax contract
+    staking = Contract("0x3EF26504dbc8Dd7B7aa3E97Bc9f3813a9FC0B4B0")
+    locked = staking.lockedLiquidityOf(strategy)
+    print("\nStrategy locked liquidity:", locked)
+
     strategy.harvest({"from": gov})
     chain.sleep(1)  # we currently lock for a day
     chain.mine(1)
@@ -449,6 +599,11 @@ def test_simple_harvest_imbalanced_pool_check_holdings(
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
 
+    # check how much liquidity we have staked in the frax contract
+    staking = Contract("0x3EF26504dbc8Dd7B7aa3E97Bc9f3813a9FC0B4B0")
+    locked = staking.lockedLiquidityOf(strategy)
+    print("\nStrategy locked liquidity:", locked)
+
     # have our whale trade in the uniV3 pool a bunch to generate some fees
     uni_values_token = [token.address, 500, frax.address]
     uni_values_frax = [frax.address, 500, token.address]
@@ -459,9 +614,7 @@ def test_simple_harvest_imbalanced_pool_check_holdings(
     token.approve(uni_router, 2**256 - 1, {"from": whale})
     frax.approve(uni_router, 2**256 - 1, {"from": whale})
     print("\nLet's do some trading!")
-    to_swap = (
-        token.balanceOf(whale) / 5
-    )  # whale has like $200m USDC, we don't need to do that lol
+    to_swap = token.balanceOf(whale) / 5  # whale drains the FRAX/USDC LP
     for i in range(2):
         exact_input = (packed_path_token, whale.address, 2**256 - 1, to_swap, 1)
         uni_router.exactInput(exact_input, {"from": whale})
@@ -472,6 +625,14 @@ def test_simple_harvest_imbalanced_pool_check_holdings(
     tradingLosses = newWhale - token.balanceOf(whale)
     print("USDC lost trading", tradingLosses / (10 ** token.decimals()))
 
+    nft_holdings = strategy.principal()
+    print(
+        "\nCurrent NFT Holdings after trading\nFRAX:",
+        nft_holdings[0] / 1e18,
+        "\nUSDC:",
+        nft_holdings[1] / 1e6,
+    )
+
     # check on our NFT LP
     real_balance = strategy.balanceOfNFTpessimistic() / (10 ** token.decimals())
     virtual_balance = strategy.balanceOfNFToptimistic() / (10 ** token.decimals())
@@ -480,10 +641,19 @@ def test_simple_harvest_imbalanced_pool_check_holdings(
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
 
+    # check how much liquidity we have staked in the frax contract
+    staking = Contract("0x3EF26504dbc8Dd7B7aa3E97Bc9f3813a9FC0B4B0")
+    locked = staking.lockedLiquidityOf(strategy)
+    print("\nStrategy locked liquidity:", locked)
+
     old_assets = vault.totalAssets()
     assert old_assets > 0
     assert strategy.estimatedTotalAssets() > 0
     print("\nStarting vault total assets: ", old_assets / (10 ** token.decimals()))
+    print(
+        "Strategy total assets:",
+        strategy.estimatedTotalAssets() / (10 ** token.decimals()),
+    )
 
     # simulate one day, since that's how long we lock for
     chain.sleep(86400)
@@ -504,6 +674,10 @@ def test_simple_harvest_imbalanced_pool_check_holdings(
     else:
         assert new_assets >= old_assets
     print("\nVault total assets after harvest: ", new_assets / (10 ** token.decimals()))
+    print(
+        "Strategy total assets:",
+        strategy.estimatedTotalAssets() / (10 ** token.decimals()),
+    )
 
     # check on our NFT LP
     real_balance = strategy.balanceOfNFTpessimistic() / (10 ** token.decimals())
@@ -512,6 +686,11 @@ def test_simple_harvest_imbalanced_pool_check_holdings(
     print("\nHere's how much is in our NFT (pessimistic):", real_balance)
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
+
+    # check how much liquidity we have staked in the frax contract
+    staking = Contract("0x3EF26504dbc8Dd7B7aa3E97Bc9f3813a9FC0B4B0")
+    locked = staking.lockedLiquidityOf(strategy)
+    print("\nStrategy locked liquidity:", locked)
 
     # Display estimated APR
     print(
@@ -526,9 +705,18 @@ def test_simple_harvest_imbalanced_pool_check_holdings(
     chain.mine(1)
 
     # turn off auto-restake since we want to withdraw after this harvest
-    strategy.setManagerParams(False, False, {"from": gov})
+    # strategy.setManagerParams(False, False, {"from": gov})
     harvest = strategy.harvest({"from": gov})
     print("\nThe is our harvest info:", harvest.events["Harvested"])
+
+    print(
+        "\nVault total assets after final harvest: ",
+        new_assets / (10 ** token.decimals()),
+    )
+    print(
+        "Strategy total assets:",
+        strategy.estimatedTotalAssets() / (10 ** token.decimals()),
+    )
 
     # check on our NFT LP
     real_balance = strategy.balanceOfNFTpessimistic() / (10 ** token.decimals())
@@ -538,6 +726,67 @@ def test_simple_harvest_imbalanced_pool_check_holdings(
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
 
+    # check how much liquidity we have staked in the frax contract
+    staking = Contract("0x3EF26504dbc8Dd7B7aa3E97Bc9f3813a9FC0B4B0")
+    locked = staking.lockedLiquidityOf(strategy)
+    print("\nStrategy locked liquidity:", locked)
+
+    # simulate 1 day for share price to rise
+    chain.sleep(86400)
+    chain.mine(1)
+    harvest = strategy.harvest({"from": gov})
+    print("\nThe is our harvest info:", harvest.events["Harvested"])
+
+    print(
+        "\nVault total assets after final harvest: ",
+        new_assets / (10 ** token.decimals()),
+    )
+    print(
+        "Strategy total assets:",
+        strategy.estimatedTotalAssets() / (10 ** token.decimals()),
+    )
+
+    # check on our NFT LP
+    real_balance = strategy.balanceOfNFTpessimistic() / (10 ** token.decimals())
+    virtual_balance = strategy.balanceOfNFToptimistic() / (10 ** token.decimals())
+    slippage = (virtual_balance - real_balance) / real_balance
+    print("\nHere's how much is in our NFT (pessimistic):", real_balance)
+    print("Here's how much is in our NFT (optimistic):", virtual_balance)
+    print("This is our slippage:", "{:.4%}".format(slippage))
+
+    # check how much liquidity we have staked in the frax contract
+    staking = Contract("0x3EF26504dbc8Dd7B7aa3E97Bc9f3813a9FC0B4B0")
+    locked = staking.lockedLiquidityOf(strategy)
+    print("\nStrategy locked liquidity:", locked)
+
+    # simulate 1 day for share price to rise
+    chain.sleep(86400)
+    chain.mine(1)
+    harvest = strategy.harvest({"from": gov})
+    print("\nThe is our harvest info:", harvest.events["Harvested"])
+
+    print(
+        "\nVault total assets after final harvest: ",
+        new_assets / (10 ** token.decimals()),
+    )
+    print(
+        "Strategy total assets:",
+        strategy.estimatedTotalAssets() / (10 ** token.decimals()),
+    )
+
+    # check on our NFT LP
+    real_balance = strategy.balanceOfNFTpessimistic() / (10 ** token.decimals())
+    virtual_balance = strategy.balanceOfNFToptimistic() / (10 ** token.decimals())
+    slippage = (virtual_balance - real_balance) / real_balance
+    print("\nHere's how much is in our NFT (pessimistic):", real_balance)
+    print("Here's how much is in our NFT (optimistic):", virtual_balance)
+    print("This is our slippage:", "{:.4%}".format(slippage))
+
+    # check how much liquidity we have staked in the frax contract
+    staking = Contract("0x3EF26504dbc8Dd7B7aa3E97Bc9f3813a9FC0B4B0")
+    locked = staking.lockedLiquidityOf(strategy)
+    print("\nStrategy locked liquidity:", locked)
+
     # simulate 1 day for share price to rise
     chain.sleep(86400)
     chain.mine(1)
@@ -545,6 +794,9 @@ def test_simple_harvest_imbalanced_pool_check_holdings(
     # withdraw and check on our losses (due to slippage on big swaps in/out)
     tx = vault.withdraw(amount, whale, 10_000, {"from": whale})
     loss = startingWhale - token.balanceOf(whale) - tradingLosses
-    print("Losses from withdrawal slippage:", loss / (10 ** token.decimals()))
+    print(
+        "Losses from withdrawal slippage (negative means we gained):",
+        loss / (10 ** token.decimals()),
+    )
     assert vault.pricePerShare() > 10 ** token.decimals()
     print("Vault share price", vault.pricePerShare() / (10 ** token.decimals()))
