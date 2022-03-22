@@ -74,11 +74,11 @@ def test_change_debt_with_profit(
     else:
         assert new_params["totalLoss"] == prev_params["totalLoss"]
 
-    # assert that our vault total assets, multiplied by our debtRatio, is about equal to our estimated total assets plus credit available (within 1 token)
+    # assert that our vault total assets, multiplied by our debtRatio, is about equal to our estimated total assets plus credit available (within our slippage)
     # we multiply this by the debtRatio of our strategy out of 10_000 total
     # we sleep 10 hours above specifically for this check
     assert math.isclose(
         vault.totalAssets() * new_params["debtRatio"] / 10_000,
         strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
-        abs_tol=1e18,
+        abs_tol=(vault.totalAssets() * (10000 - strategy.slippageMax())),
     )
