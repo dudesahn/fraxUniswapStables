@@ -372,8 +372,8 @@ contract StrategyFraxUniswapDAI is BaseStrategy {
                 IUniNFT.increaseStruct memory setIncrease =
                     IUniNFT.increaseStruct(
                         nftId,
-                        fraxBalance(),
                         balanceOfWant(),
+                        fraxBalance(),
                         0,
                         0,
                         block.timestamp
