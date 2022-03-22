@@ -63,8 +63,6 @@ contract StrategyFraxUniswapDAI is BaseStrategy {
         IERC20(0x853d955aCEf822Db058eb8505911ED77F175b99e);
     IERC20 internal constant fxs =
         IERC20(0x3432B6A60D23Ca0dFCa7761B7ab56459D9C964D0);
-    IERC20 internal constant weth =
-        IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
     // uniswap v3 NFT address
     address internal constant uniNFT =
@@ -305,7 +303,7 @@ contract StrategyFraxUniswapDAI is BaseStrategy {
         forceHarvestTriggerOnce = false;
     }
 
-    // Swap FXS -> WETH on UniV2, then WETH -> want on UniV3
+    // Swap FXS -> FRAX on UniV2
     function _swapFXS(uint256 _amountIn) internal {
         address[] memory path = new address[](2);
         path[0] = address(fxs);
