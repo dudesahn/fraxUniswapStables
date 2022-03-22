@@ -244,7 +244,7 @@ def test_simple_harvest_with_uni_fees(
     print("\nLet's do some trading!")
     to_swap = (
         token.balanceOf(whale) / 15
-    )  # whale has like $200m DAI, we don't need to do that lol
+    )  # whale has like $1b DAI, we don't need to do that lol
     # note that if we do enough, we will drain all FRAX, and then won't get any more rewards from the staking pool
     for i in range(3):
         exact_input = (packed_path_token, whale.address, 2**256 - 1, to_swap, 1)
@@ -414,8 +414,8 @@ def test_simple_harvest_imbalanced_pool(
     frax.approve(uni_router, 2**256 - 1, {"from": whale})
     print("\nLet's do some trading!")
     to_swap = (
-        token.balanceOf(whale) / 15
-    )  # whale has like $200m DAI, we don't need to do that lol
+        token.balanceOf(whale) / 80
+    )  # whale has like $1b DAI, we don't need to do that lol
     # note that if we do enough, we will drain all FRAX, and then won't get any more rewards from the staking pool
     for i in range(3):
         exact_input = (packed_path_token, whale.address, 2**256 - 1, to_swap, 1)
@@ -604,8 +604,11 @@ def test_simple_harvest_imbalanced_pool_check_holdings(
     token.approve(uni_router, 2**256 - 1, {"from": whale})
     frax.approve(uni_router, 2**256 - 1, {"from": whale})
     print("\nLet's do some trading!")
-    to_swap = token.balanceOf(whale) / 5  # whale drains the FRAX/DAI LP
-    for i in range(2):
+    to_swap = (
+        token.balanceOf(whale) / 80
+    )  # whale has like $1b DAI, we don't need to do that lol
+    # note that if we do enough, we will drain all FRAX, and then won't get any more rewards from the staking pool
+    for i in range(3):
         exact_input = (packed_path_token, whale.address, 2**256 - 1, to_swap, 1)
         uni_router.exactInput(exact_input, {"from": whale})
         chain.sleep(1)

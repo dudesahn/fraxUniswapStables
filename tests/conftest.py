@@ -34,8 +34,8 @@ def tests_using_tenderly():
 @pytest.fixture(scope="module")
 def whale(accounts):
     # Totally in it for the tech
-    # Update this with a large holder of your want token (the largest EOA holder of DAI)
-    whale = accounts.at("0x7abE0cE388281d2aCF297Cb089caef3819b13448", force=True)
+    # Update this with a large holder of your want token (the largest EOA holder of DAI, avax bridge)
+    whale = accounts.at("0xE78388b4CE79068e89Bf8aA7f218eF6b9AB0e9d0", force=True)
     yield whale
 
 
