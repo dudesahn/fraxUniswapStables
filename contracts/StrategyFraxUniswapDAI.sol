@@ -75,8 +75,6 @@ contract StrategyFraxUniswapDAI is BaseStrategy {
         0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
     ICurveFi internal constant curve =
         ICurveFi(0xd632f22692FaC7611d2AA1C0D552930D43CAEd3B);
-    address internal constant uniswapv3 =
-        0xE592427A0AEce92De3Edee1F18E0157C05861564;
 
     // setters
     bool public reLockProfits; // true if we choose to re-lock profits following each harvest and automatically start another epoch
@@ -115,7 +113,6 @@ contract StrategyFraxUniswapDAI is BaseStrategy {
         want.approve(uniNFT, type(uint256).max);
         frax.approve(uniNFT, type(uint256).max);
         fxs.approve(unirouter, type(uint256).max);
-        weth.approve(uniswapv3, type(uint256).max);
     }
 
     function initialize(
