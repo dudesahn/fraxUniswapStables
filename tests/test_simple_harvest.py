@@ -657,7 +657,7 @@ def test_simple_harvest_imbalanced_pool_check_holdings(
 
     # harvest, store new asset amount
     chain.sleep(1)
-    
+
     # turn off health check in case we don't have enough trading fees to be profitable yet
     strategy.setDoHealthCheck(False, {"from": gov})
     harvest = strategy.harvest({"from": gov})
