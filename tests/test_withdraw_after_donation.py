@@ -63,13 +63,13 @@ def test_withdraw_after_donation_1(
     # check that we didn't add more than our slippage
     assert new_params["totalLoss"] <= vault.totalAssets() * (1 - slippage)
 
-    # assert that our vault total assets, multiplied by our debtRatio, is about equal to our estimated total assets plus credit available (within 1 token)
+    # assert that our vault total assets, multiplied by our debtRatio, is about equal to our estimated total assets plus credit available (within our slippage)
     # we multiply this by the debtRatio of our strategy out of 10_000 total
     # we sleep 10 hours above specifically for this check
     assert math.isclose(
         vault.totalAssets() * new_params["debtRatio"] / 10_000,
         strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
-        abs_tol=1e18,
+        abs_tol=(vault.totalAssets() * (10000 - strategy.slippageMax())),
     )
 
     # withdraw and check on our losses (due to slippage on big swaps in/out, also our donation)
@@ -149,13 +149,13 @@ def test_withdraw_after_donation_2(
     # check that we didn't add more than our slippage
     assert new_params["totalLoss"] <= vault.totalAssets() * (1 - slippage)
 
-    # assert that our vault total assets, multiplied by our debtRatio, is about equal to our estimated total assets plus credit available (within 1 token)
+    # assert that our vault total assets, multiplied by our debtRatio, is about equal to our estimated total assets plus credit available (within our slippage)
     # we multiply this by the debtRatio of our strategy out of 10_000 total
     # we sleep 10 hours above specifically for this check
     assert math.isclose(
         vault.totalAssets() * new_params["debtRatio"] / 10_000,
         strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
-        abs_tol=1e18,
+        abs_tol=(vault.totalAssets() * (10000 - strategy.slippageMax())),
     )
 
 
@@ -222,13 +222,13 @@ def test_withdraw_after_donation_3(
     # check that we didn't add more than our slippage
     assert new_params["totalLoss"] <= vault.totalAssets() * (1 - slippage)
 
-    # assert that our vault total assets, multiplied by our debtRatio, is about equal to our estimated total assets plus credit available (within 1 token)
+    # assert that our vault total assets, multiplied by our debtRatio, is about equal to our estimated total assets plus credit available (within our slippage)
     # we multiply this by the debtRatio of our strategy out of 10_000 total
     # we sleep 10 hours above specifically for this check
     assert math.isclose(
         vault.totalAssets() * new_params["debtRatio"] / 10_000,
         strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
-        abs_tol=1e18,
+        abs_tol=(vault.totalAssets() * (10000 - strategy.slippageMax())),
     )
 
 
@@ -298,13 +298,13 @@ def test_withdraw_after_donation_4(
     # check to make sure that our debtRatio is about half of our previous debt
     assert new_params["debtRatio"] == currentDebt / 2
 
-    # assert that our vault total assets, multiplied by our debtRatio, is about equal to our estimated total assets plus credit available (within 1 token)
+    # assert that our vault total assets, multiplied by our debtRatio, is about equal to our estimated total assets plus credit available (within our slippage)
     # we multiply this by the debtRatio of our strategy out of 10_000 total
     # we sleep 10 hours above specifically for this check
     assert math.isclose(
         vault.totalAssets() * new_params["debtRatio"] / 10_000,
         strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
-        abs_tol=1e18,
+        abs_tol=(vault.totalAssets() * (10000 - strategy.slippageMax())),
     )
 
 
@@ -367,13 +367,13 @@ def test_withdraw_after_donation_5(
     # check that we didn't add more than our slippage
     assert new_params["totalLoss"] <= vault.totalAssets() * (1 - slippage)
 
-    # assert that our vault total assets, multiplied by our debtRatio, is about equal to our estimated total assets plus credit available (within 1 token)
+    # assert that our vault total assets, multiplied by our debtRatio, is about equal to our estimated total assets plus credit available (within our slippage)
     # we multiply this by the debtRatio of our strategy out of 10_000 total
     # we sleep 10 hours above specifically for this check
     assert math.isclose(
         vault.totalAssets() * new_params["debtRatio"] / 10_000,
         strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
-        abs_tol=1e18,
+        abs_tol=(vault.totalAssets() * (10000 - strategy.slippageMax())),
     )
 
 
@@ -433,13 +433,13 @@ def test_withdraw_after_donation_6(
     # check that we didn't add more than our slippage
     assert new_params["totalLoss"] <= vault.totalAssets() * (1 - slippage)
 
-    # assert that our vault total assets, multiplied by our debtRatio, is about equal to our estimated total assets plus credit available (within 1 token)
+    # assert that our vault total assets, multiplied by our debtRatio, is about equal to our estimated total assets plus credit available (within our slippage)
     # we multiply this by the debtRatio of our strategy out of 10_000 total
     # we sleep 10 hours above specifically for this check
     assert math.isclose(
         vault.totalAssets() * new_params["debtRatio"] / 10_000,
         strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
-        abs_tol=1e18,
+        abs_tol=(vault.totalAssets() * (10000 - strategy.slippageMax())),
     )
 
 
