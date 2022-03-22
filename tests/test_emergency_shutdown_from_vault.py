@@ -12,8 +12,6 @@ def test_emergency_shutdown_from_vault(
     strategy,
     chain,
     amount,
-    is_slippery,
-    no_profit,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)

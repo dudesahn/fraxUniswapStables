@@ -12,8 +12,6 @@ def test_withdraw_after_donation_1(
     strategy,
     chain,
     amount,
-    is_slippery,
-    no_profit,
 ):
 
     ## deposit to the vault after approving
@@ -99,8 +97,6 @@ def test_withdraw_after_donation_2(
     strategy,
     chain,
     amount,
-    is_slippery,
-    no_profit,
 ):
 
     ## deposit to the vault after approving
@@ -169,8 +165,6 @@ def test_withdraw_after_donation_3(
     strategy,
     chain,
     amount,
-    is_slippery,
-    no_profit,
 ):
 
     ## deposit to the vault after approving
@@ -242,8 +236,6 @@ def test_withdraw_after_donation_4(
     strategy,
     chain,
     amount,
-    is_slippery,
-    no_profit,
 ):
 
     ## deposit to the vault after approving
@@ -318,8 +310,6 @@ def test_withdraw_after_donation_5(
     strategy,
     chain,
     amount,
-    is_slippery,
-    no_profit,
 ):
 
     ## deposit to the vault after approving
@@ -387,8 +377,6 @@ def test_withdraw_after_donation_6(
     strategy,
     chain,
     amount,
-    is_slippery,
-    no_profit,
 ):
 
     ## deposit to the vault after approving
@@ -453,8 +441,6 @@ def test_withdraw_after_donation_7(
     strategy,
     chain,
     amount,
-    is_slippery,
-    no_profit,
 ):
 
     ## deposit to the vault after approving
@@ -512,12 +498,12 @@ def test_withdraw_after_donation_7(
 
     profit = new_params["totalGain"] - prev_params["totalGain"]
 
-    # check that our gain is greater than our donation, with 1% for slippage
-    assert profit >= donation * 0.99  # assume ~1% slippage or less
+    # check that our gain is greater than our donation, with our preset slippage
+    assert profit >= donation * slippage
     assert profit >= 0
 
-    # check that we didn't add more than 1% loss
-    assert new_params["totalLoss"] <= vault.totalAssets() * 1.01
+    # check that we didn't add more than our slippage
+    assert new_params["totalLoss"] <= vault.totalAssets() * (1 - slippage)
 
 
 # lower debtRatio to 0, donate, withdraw less than the donation, then harvest
@@ -530,8 +516,6 @@ def test_withdraw_after_donation_8(
     strategy,
     chain,
     amount,
-    is_slippery,
-    no_profit,
 ):
 
     ## deposit to the vault after approving
@@ -588,9 +572,9 @@ def test_withdraw_after_donation_8(
 
     profit = new_params["totalGain"] - prev_params["totalGain"]
 
-    # check that our gain is greater than our donation, with 1% for slippage
-    assert profit >= donation * 0.99  # assume ~1% slippage or less
+    # check that our gain is greater than our donation, with our preset slippage
+    assert profit >= donation * slippage
     assert profit >= 0
 
-    # check that we didn't add more than 1% loss
-    assert new_params["totalLoss"] <= vault.totalAssets() * 1.01
+    # check that we didn't add more than our slippage
+    assert new_params["totalLoss"] <= vault.totalAssets() * (1 - slippage)

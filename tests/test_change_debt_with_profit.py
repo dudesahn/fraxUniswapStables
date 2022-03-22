@@ -12,8 +12,6 @@ def test_change_debt_with_profit(
     strategy,
     chain,
     amount,
-    no_profit,
-    is_slippery,
 ):
 
     ## deposit to the vault after approving
@@ -67,12 +65,7 @@ def test_change_debt_with_profit(
     assert new_params["debtRatio"] == currentDebt / 2
 
     # check that we didn't add any more loss, or at least no more than 10 wei if we get slippage on deposit/withdrawal
-    if is_slippery:
-        assert math.isclose(
-            new_params["totalLoss"], prev_params["totalLoss"], abs_tol=10
-        )
-    else:
-        assert new_params["totalLoss"] == prev_params["totalLoss"]
+    assert new_params["totalLoss"] == prev_params["totalLoss"]
 
     # assert that our vault total assets, multiplied by our debtRatio, is about equal to our estimated total assets plus credit available (within our slippage)
     # we multiply this by the debtRatio of our strategy out of 10_000 total

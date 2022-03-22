@@ -15,9 +15,7 @@ def test_odds_and_ends(
     strategist_ms,
     StrategyFraxUniswapUSDC,
     amount,
-    is_slippery,
     healthCheck,
-    no_profit,
 ):
 
     ## deposit to the vault after approving. turn off health check before each harvest since we're doing weird shit
@@ -124,10 +122,7 @@ def test_odds_and_ends(
     new_strat_balance = new_strategy.estimatedTotalAssets()
 
     # confirm we made money, or at least that we have about the same
-    if is_slippery and no_profit:
-        assert math.isclose(new_strat_balance, total_old, abs_tol=10)
-    else:
-        assert new_strat_balance >= total_old
+    assert new_strat_balance >= total_old
 
     startingVault = vault.totalAssets()
     print("\nVault starting assets with new strategy: ", startingVault)
@@ -151,10 +146,7 @@ def test_odds_and_ends(
     vaultAssets_2 = vault.totalAssets()
 
     # confirm we made money, or at least that we have about the same
-    if is_slippery and no_profit:
-        assert math.isclose(vaultAssets_2, startingVault, abs_tol=10)
-    else:
-        assert vaultAssets_2 > startingVault
+    assert vaultAssets_2 > startingVault
 
     print("\nAssets after 1 day harvest: ", vaultAssets_2)
 
@@ -239,7 +231,6 @@ def test_odds_and_ends_liquidatePosition(
     chain,
     strategist_ms,
     amount,
-    no_profit,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -287,10 +278,7 @@ def test_odds_and_ends_liquidatePosition(
 
     # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
-    if no_profit:
-        assert math.isclose(token.balanceOf(whale) + amount, startingWhale, abs_tol=10)
-    else:
-        assert token.balanceOf(whale) + to_transfer >= startingWhale
+    assert token.balanceOf(whale) + to_transfer >= startingWhale
 
 
 def test_odds_and_ends_rekt(

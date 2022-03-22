@@ -17,7 +17,6 @@ def test_simple_harvest(
     strategist_ms,
     amount,
     accounts,
-    no_profit,
     frax,
 ):
     ## deposit to the vault after approving
@@ -191,7 +190,6 @@ def test_simple_harvest_with_uni_fees(
     strategist_ms,
     amount,
     accounts,
-    no_profit,
     frax,
 ):
     ## deposit to the vault after approving
@@ -292,10 +290,7 @@ def test_simple_harvest_with_uni_fees(
     chain.sleep(1)
     new_assets = vault.totalAssets()
     # confirm we made money, or at least that we have about the same
-    if no_profit:
-        assert math.isclose(new_assets, old_assets, abs_tol=10)
-    else:
-        assert new_assets >= old_assets
+    assert new_assets >= old_assets
     print("\nVault total assets after harvest: ", new_assets / (10 ** token.decimals()))
 
     # check on our NFT LP
@@ -366,7 +361,6 @@ def test_simple_harvest_imbalanced_pool(
     strategist_ms,
     amount,
     accounts,
-    no_profit,
     frax,
 ):
     ## deposit to the vault after approving
@@ -474,10 +468,7 @@ def test_simple_harvest_imbalanced_pool(
     chain.sleep(1)
     new_assets = vault.totalAssets()
     # confirm we made money, or at least that we have about the same
-    if no_profit:
-        assert math.isclose(new_assets, old_assets, abs_tol=10)
-    else:
-        assert new_assets >= old_assets
+    assert new_assets >= old_assets
     print("\nVault total assets after harvest: ", new_assets / (10 ** token.decimals()))
     print(
         "Strategy total assets:",
@@ -561,7 +552,6 @@ def test_simple_harvest_imbalanced_pool_check_holdings(
     strategist_ms,
     amount,
     accounts,
-    no_profit,
     frax,
 ):
     ## deposit to the vault after approving
@@ -669,10 +659,7 @@ def test_simple_harvest_imbalanced_pool_check_holdings(
     chain.sleep(1)
     new_assets = vault.totalAssets()
     # confirm we made money, or at least that we have about the same
-    if no_profit:
-        assert math.isclose(new_assets, old_assets, abs_tol=10)
-    else:
-        assert new_assets >= old_assets
+    assert new_assets >= old_assets
     print("\nVault total assets after harvest: ", new_assets / (10 ** token.decimals()))
     print(
         "Strategy total assets:",

@@ -13,8 +13,6 @@ def test_change_debt(
     strategy,
     chain,
     amount,
-    is_slippery,
-    no_profit,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)

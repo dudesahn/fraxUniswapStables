@@ -46,20 +46,6 @@ def amount():
     yield amount
 
 
-# use this to test our strategy in case there are no profits
-@pytest.fixture(scope="module")
-def no_profit():
-    no_profit = False
-    yield no_profit
-
-
-# use this when we might lose a few wei on conversions between want and another deposit token
-@pytest.fixture(scope="module")
-def is_slippery():
-    is_slippery = True
-    yield is_slippery
-
-
 # Define relevant tokens and contracts in this section
 @pytest.fixture(scope="module")
 def token():
