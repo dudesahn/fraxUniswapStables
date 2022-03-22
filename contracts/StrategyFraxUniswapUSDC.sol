@@ -75,14 +75,11 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
     ICurveFi internal constant curve =
         ICurveFi(0xd632f22692FaC7611d2AA1C0D552930D43CAEd3B);
-    address internal constant uniswapv3 =
-        0xE592427A0AEce92De3Edee1F18E0157C05861564;
 
     // setters
     bool public reLockProfits; // true if we choose to re-lock profits following each harvest and automatically start another epoch
     bool public checkTrueHoldings; // bool to reset our profit/loss based on the amount we have if we withdrew everything at once
     uint256 public slippageMax; // in bips, how much slippage we allow between our optimistic assets and pessimistic. 50 = 0.5% slippage. Remember curve swap costs 0.04%.
-    uint24 public uniStableFee; // this is equal to 0.05%, can change this later if a different path becomes more optimal
     bool internal forceHarvestTriggerOnce; // only set this to true externally when we want to trigger our keepers to harvest for us
 
     // do we need to add a maxInvest parameter here?
@@ -116,10 +113,6 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         want.approve(uniNFT, type(uint256).max);
         frax.approve(uniNFT, type(uint256).max);
         fxs.approve(unirouter, type(uint256).max);
-        weth.approve(uniswapv3, type(uint256).max);
-
-        // set our uniswap pool fees
-        uniStableFee = 500;
     }
 
     function initialize(
