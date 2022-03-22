@@ -14,7 +14,6 @@ def test_triggers(
     chain,
     strategist_ms,
     amount,
-    no_profit,
     gas_oracle,
 ):
     ## deposit to the vault after approving

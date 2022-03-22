@@ -16,8 +16,6 @@ def test_cloning(
     StrategyFraxUniswapDAI,
     guardian,
     amount,
-    no_profit,
-    is_slippery,
     tests_using_tenderly,
 ):
     # tenderly doesn't work for "with brownie.reverts"
@@ -110,10 +108,7 @@ def test_cloning(
     new_assets_dai = vault.totalAssets()
     # we can't use strategyEstimated Assets because the profits are sent to the vault
     # if we're not making profit, check that we didn't lose too much on conversions
-    if is_slippery and no_profit:
-        assert math.isclose(new_assets_dai, old_assets_dai, abs_tol=10)
-    else:
-        assert new_assets_dai >= old_assets_dai
+    assert new_assets_dai >= old_assets_dai
 
     print("\nAssets after 2 days: ", new_assets_dai / (10 ** token.decimals()))
 
