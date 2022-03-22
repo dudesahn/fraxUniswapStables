@@ -13,7 +13,7 @@ def test_cloning(
     keeper,
     rewards,
     chain,
-    StrategyFraxUniswapUSDC,
+    StrategyFraxUniswapDAI,
     guardian,
     amount,
     no_profit,
@@ -30,7 +30,7 @@ def test_cloning(
             keeper,
             {"from": gov},
         )
-        newStrategy = StrategyFraxUniswapUSDC.at(tx.return_value)
+        newStrategy = StrategyFraxUniswapDAI.at(tx.return_value)
     else:
         # Shouldn't be able to call initialize again
         with brownie.reverts():
@@ -50,7 +50,7 @@ def test_cloning(
             keeper,
             {"from": gov},
         )
-        newStrategy = StrategyFraxUniswapUSDC.at(tx.return_value)
+        newStrategy = StrategyFraxUniswapDAI.at(tx.return_value)
 
         # Shouldn't be able to call initialize again
         with brownie.reverts():

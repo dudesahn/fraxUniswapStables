@@ -13,7 +13,7 @@ def test_odds_and_ends(
     strategy,
     chain,
     strategist_ms,
-    StrategyFraxUniswapUSDC,
+    StrategyFraxUniswapDAI,
     amount,
     is_slippery,
     healthCheck,
@@ -74,7 +74,7 @@ def test_odds_and_ends(
     # we can try migrating too!
     # deploy our new strategy
     new_strategy = strategist.deploy(
-        StrategyFraxUniswapUSDC,
+        StrategyFraxUniswapDAI,
         vault,
     )
     total_old = strategy.estimatedTotalAssets()

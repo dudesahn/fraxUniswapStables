@@ -38,7 +38,7 @@ def test_simple_harvest(
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
     print(
-        "\nDust left in strategy\nUSDC:",
+        "\nDust left in strategy\nDAI:",
         strategy.balanceOfWant() / (10 ** token.decimals()),
         "\nFRAX:",
         strategy.fraxBalance() / 1e18,
@@ -56,7 +56,7 @@ def test_simple_harvest(
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
     print(
-        "\nDust left in strategy\nUSDC:",
+        "\nDust left in strategy\nDAI:",
         strategy.balanceOfWant() / (10 ** token.decimals()),
         "\nFRAX:",
         strategy.fraxBalance() / 1e18,
@@ -89,7 +89,7 @@ def test_simple_harvest(
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
     print(
-        "\nDust left in strategy\nUSDC:",
+        "\nDust left in strategy\nDAI:",
         strategy.balanceOfWant() / (10 ** token.decimals()),
         "\nFRAX:",
         strategy.fraxBalance() / 1e18,
@@ -124,7 +124,7 @@ def test_simple_harvest(
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
     print(
-        "\nDust left in strategy\nUSDC:",
+        "\nDust left in strategy\nDAI:",
         strategy.balanceOfWant() / (10 ** token.decimals()),
         "\nFRAX:",
         strategy.fraxBalance() / 1e18,
@@ -152,7 +152,7 @@ def test_simple_harvest(
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
     print(
-        "\nDust left in strategy\nUSDC:",
+        "\nDust left in strategy\nDAI:",
         strategy.balanceOfWant() / (10 ** token.decimals()),
         "\nFRAX:",
         strategy.fraxBalance() / 1e18,
@@ -246,7 +246,7 @@ def test_simple_harvest_with_uni_fees(
     print("\nLet's do some trading!")
     to_swap = (
         token.balanceOf(whale) / 15
-    )  # whale has like $200m USDC, we don't need to do that lol
+    )  # whale has like $200m DAI, we don't need to do that lol
     # note that if we do enough, we will drain all FRAX, and then won't get any more rewards from the staking pool
     for i in range(3):
         exact_input = (packed_path_token, whale.address, 2**256 - 1, to_swap, 1)
@@ -261,7 +261,7 @@ def test_simple_harvest_with_uni_fees(
         chain.mine(1)
 
     tradingLosses = newWhale - token.balanceOf(whale)
-    print("USDC lost trading", tradingLosses / (10 ** token.decimals()))
+    print("DAI lost trading", tradingLosses / (10 ** token.decimals()))
 
     # check on our NFT LP
     real_balance = strategy.balanceOfNFTpessimistic() / (10 ** token.decimals())
@@ -421,7 +421,7 @@ def test_simple_harvest_imbalanced_pool(
     print("\nLet's do some trading!")
     to_swap = (
         token.balanceOf(whale) / 15
-    )  # whale has like $200m USDC, we don't need to do that lol
+    )  # whale has like $200m DAI, we don't need to do that lol
     # note that if we do enough, we will drain all FRAX, and then won't get any more rewards from the staking pool
     for i in range(3):
         exact_input = (packed_path_token, whale.address, 2**256 - 1, to_swap, 1)
@@ -431,14 +431,14 @@ def test_simple_harvest_imbalanced_pool(
         print("Done with round", i)
 
     tradingLosses = newWhale - token.balanceOf(whale)
-    print("USDC lost trading", tradingLosses / (10 ** token.decimals()))
+    print("DAI lost trading", tradingLosses / (10 ** token.decimals()))
 
     nft_holdings = strategy.principal()
     print(
         "\nCurrent NFT Holdings after trading\nFRAX:",
         nft_holdings[0] / 1e18,
-        "\nUSDC:",
-        nft_holdings[1] / 1e6,
+        "\nDAI:",
+        nft_holdings[1] / 1e18,
     )
 
     # check on our NFT LP
@@ -614,7 +614,7 @@ def test_simple_harvest_imbalanced_pool_check_holdings(
     token.approve(uni_router, 2**256 - 1, {"from": whale})
     frax.approve(uni_router, 2**256 - 1, {"from": whale})
     print("\nLet's do some trading!")
-    to_swap = token.balanceOf(whale) / 5  # whale drains the FRAX/USDC LP
+    to_swap = token.balanceOf(whale) / 5  # whale drains the FRAX/DAI LP
     for i in range(2):
         exact_input = (packed_path_token, whale.address, 2**256 - 1, to_swap, 1)
         uni_router.exactInput(exact_input, {"from": whale})
@@ -623,14 +623,14 @@ def test_simple_harvest_imbalanced_pool_check_holdings(
         print("Done with round", i)
 
     tradingLosses = newWhale - token.balanceOf(whale)
-    print("USDC lost trading", tradingLosses / (10 ** token.decimals()))
+    print("DAI lost trading", tradingLosses / (10 ** token.decimals()))
 
     nft_holdings = strategy.principal()
     print(
         "\nCurrent NFT Holdings after trading\nFRAX:",
         nft_holdings[0] / 1e18,
-        "\nUSDC:",
-        nft_holdings[1] / 1e6,
+        "\nDAI:",
+        nft_holdings[1] / 1e18,
     )
 
     # check on our NFT LP

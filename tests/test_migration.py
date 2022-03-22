@@ -5,7 +5,7 @@ import math
 
 # test that we can migrate from an old strategy to a new one and that it works normally
 def test_migration(
-    StrategyFraxUniswapUSDC,
+    StrategyFraxUniswapDAI,
     gov,
     token,
     vault,
@@ -30,7 +30,7 @@ def test_migration(
 
     # deploy our new strategy
     new_strategy = strategist.deploy(
-        StrategyFraxUniswapUSDC,
+        StrategyFraxUniswapDAI,
         vault,
     )
     total_old = strategy.estimatedTotalAssets()

@@ -34,7 +34,7 @@ def tests_using_tenderly():
 @pytest.fixture(scope="module")
 def whale(accounts):
     # Totally in it for the tech
-    # Update this with a large holder of your want token (the largest EOA holder of USDC)
+    # Update this with a large holder of your want token (the largest EOA holder of DAI)
     whale = accounts.at("0x7abE0cE388281d2aCF297Cb089caef3819b13448", force=True)
     yield whale
 
@@ -42,7 +42,7 @@ def whale(accounts):
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 2_500_000e6
+    amount = 2_500_000e18
     yield amount
 
 
@@ -64,7 +64,7 @@ def is_slippery():
 @pytest.fixture(scope="module")
 def token():
     # this should be the address of the ERC-20 used by the strategy/vault
-    token_address = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+    token_address = "0x6B175474E89094C44Da98b954EedeAC495271d0F"
     yield Contract(token_address)
 
 
@@ -171,7 +171,7 @@ def vault(pm, gov, rewards, guardian, management, token, chain):
 # replace the first value with the name of your strategy
 @pytest.fixture(scope="function")
 def strategy(
-    StrategyFraxUniswapUSDC,
+    StrategyFraxUniswapDAI,
     strategist,
     keeper,
     vault,
@@ -186,7 +186,7 @@ def strategy(
 ):
     # make sure to include all constructor parameters needed here
     strategy = strategist.deploy(
-        StrategyFraxUniswapUSDC,
+        StrategyFraxUniswapDAI,
         vault,
     )
     strategy.setKeeper(keeper, {"from": gov})
@@ -205,7 +205,7 @@ def strategy(
     assert tx == False
 
     # setup our NFT
-    token.transfer(strategy, 100e6, {"from": whale})
+    token.transfer(strategy, 100e18, {"from": whale})
     strategy.mintNFT({"from": gov})
 
     # do this for our tenderly verification
