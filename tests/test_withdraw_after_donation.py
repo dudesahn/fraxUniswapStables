@@ -40,7 +40,7 @@ def test_withdraw_after_donation_1(
     vault.withdraw(donation / 2, {"from": whale})
 
     # try to check our true holdings to see this profit
-    tx = strategy.setManagerParams(True, True, {"from": gov})
+    tx = strategy.setManagerParams(True, True, 50, {"from": gov})
 
     # turn off health check since we just took big profit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -124,7 +124,7 @@ def test_withdraw_after_donation_2(
     vault.withdraw(donation / 2, {"from": whale})
 
     # try to check our true holdings to see this profit
-    tx = strategy.setManagerParams(True, True, {"from": gov})
+    tx = strategy.setManagerParams(True, True, 50, {"from": gov})
 
     # turn off health check since we just took big profit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -195,7 +195,7 @@ def test_withdraw_after_donation_3(
     )
 
     # try to check our true holdings to see this profit
-    tx = strategy.setManagerParams(True, True, {"from": gov})
+    tx = strategy.setManagerParams(True, True, 50, {"from": gov})
 
     # turn off health check since we just took big profit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -266,7 +266,7 @@ def test_withdraw_after_donation_4(
     )
 
     # try to check our true holdings to see this profit
-    tx = strategy.setManagerParams(True, True, {"from": gov})
+    tx = strategy.setManagerParams(True, True, 50, {"from": gov})
 
     # turn off health check since we just took big profit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -336,7 +336,7 @@ def test_withdraw_after_donation_5(
     )
 
     # try to check our true holdings to see this profit
-    tx = strategy.setManagerParams(True, True, {"from": gov})
+    tx = strategy.setManagerParams(True, True, 50, {"from": gov})
 
     # turn off health check since we just took big profit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -400,7 +400,7 @@ def test_withdraw_after_donation_6(
     vault.withdraw(donation / 2, {"from": whale})
 
     # try to check our true holdings to see this profit
-    tx = strategy.setManagerParams(True, True, {"from": gov})
+    tx = strategy.setManagerParams(True, True, 50, {"from": gov})
 
     # turn off health check since we just took big profit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -468,7 +468,7 @@ def test_withdraw_after_donation_7(
 
     # try to check our true holdings to see this profit
     # if we're going to do this method, then we need to set emergencyExit to make sure we get everything out
-    tx = strategy.setManagerParams(True, True, {"from": gov})
+    tx = strategy.setManagerParams(True, True, 50, {"from": gov})
     strategy.setEmergencyExit({"from": gov})
 
     # turn off health check since we just took big profit
@@ -542,7 +542,7 @@ def test_withdraw_after_donation_8(
 
     # try to check our true holdings to see this profit
     # if we're going to do this method, then we need to set emergencyExit to make sure we get everything out
-    tx = strategy.setManagerParams(True, True, {"from": gov})
+    tx = strategy.setManagerParams(True, True, 50, {"from": gov})
     strategy.setEmergencyExit({"from": gov})
 
     # turn off health check since we just took big profit

@@ -33,7 +33,7 @@ def test_odds_and_ends(
     chain.sleep(1)
 
     # make sure we don't re-lock our NFT so we can send it away
-    strategy.setManagerParams(False, False, {"from": gov})
+    strategy.setManagerParams(False, False, 50, {"from": gov})
     strategy.harvest({"from": gov})
     chain.mine(1)
     chain.sleep(1)
@@ -193,7 +193,7 @@ def test_odds_and_ends_2(
     chain.sleep(1)
 
     # make sure we don't re-lock our NFT so we can send it away
-    strategy.setManagerParams(False, False, {"from": gov})
+    strategy.setManagerParams(False, False, 50, {"from": gov})
     strategy.harvest({"from": gov})
     chain.mine(1)
     chain.sleep(1)
@@ -307,7 +307,7 @@ def test_odds_and_ends_rekt(
     chain.sleep(1)
 
     # make sure we don't re-lock our NFT so we can send it away
-    strategy.setManagerParams(False, False, {"from": gov})
+    strategy.setManagerParams(False, False, 50, {"from": gov})
     strategy.harvest({"from": gov})
     chain.mine(1)
     chain.sleep(1)
@@ -363,7 +363,7 @@ def test_odds_and_ends_liquidate_rekt(
     chain.sleep(1)
 
     # make sure we don't re-lock our NFT so we can send it away
-    strategy.setManagerParams(False, False, {"from": gov})
+    strategy.setManagerParams(False, False, 50, {"from": gov})
     strategy.harvest({"from": gov})
     chain.mine(1)
     chain.sleep(1)

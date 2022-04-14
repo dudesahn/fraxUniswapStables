@@ -162,7 +162,7 @@ def test_simple_harvest(
     chain.mine(1)
 
     # turn off auto-restake since we want to withdraw after this harvest
-    strategy.setManagerParams(False, False, {"from": gov})
+    strategy.setManagerParams(False, False, 50, {"from": gov})
     harvest = strategy.harvest({"from": gov})
     print("The is our harvest info:", harvest.events["Harvested"])
 
@@ -319,7 +319,7 @@ def test_simple_harvest_with_uni_fees(
     chain.mine(1)
 
     # turn off auto-restake since we want to withdraw after this harvest
-    strategy.setManagerParams(False, False, {"from": gov})
+    strategy.setManagerParams(False, False, 50, {"from": gov})
     harvest = strategy.harvest({"from": gov})
     print("\nThe is our harvest info:", harvest.events["Harvested"])
 
@@ -501,7 +501,7 @@ def test_simple_harvest_imbalanced_pool(
     chain.mine(1)
 
     # turn off auto-restake since we want to withdraw after this harvest
-    strategy.setManagerParams(False, False, {"from": gov})
+    strategy.setManagerParams(False, False, 50, {"from": gov})
     harvest = strategy.harvest({"from": gov})
     print("\nThe is our harvest info:", harvest.events["Harvested"])
 
@@ -653,7 +653,7 @@ def test_simple_harvest_imbalanced_pool_check_holdings(
     chain.mine(1)
 
     # try to check our true holdings to see this profit
-    tx = strategy.setManagerParams(True, True, {"from": gov})
+    tx = strategy.setManagerParams(True, True, 50, {"from": gov})
 
     # harvest, store new asset amount
     chain.sleep(1)
@@ -699,7 +699,7 @@ def test_simple_harvest_imbalanced_pool_check_holdings(
     chain.mine(1)
 
     # turn off auto-restake since we want to withdraw after this harvest
-    # strategy.setManagerParams(False, False, {"from": gov})
+    # strategy.setManagerParams(False, False, 50, {"from": gov})
     harvest = strategy.harvest({"from": gov})
     print("\nThe is our harvest info:", harvest.events["Harvested"])
 
