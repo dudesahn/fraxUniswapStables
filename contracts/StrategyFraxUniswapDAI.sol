@@ -188,19 +188,19 @@ contract StrategyFraxUniswapDAI is BaseStrategy {
 
     // returns balance of our UniV3 LP, assuming 1 FRAX = 1 want
     function balanceOfNFToptimistic() public view returns (uint256) {
-        (uint256 amount0, uint256 amount1) = principal();
-        return amount0.add(amount1);
+        (uint256 daiBalance, uint256 fraxBalance) = principal();
+        return daiBalance.add(fraxBalance);
     }
 
     // returns balance of our UniV3 LP, swapping all FRAX to want using Curve
     function balanceOfNFTpessimistic() public view returns (uint256) {
-        (uint256 amount0, uint256 amount1) = principal();
-        // only bother adding/converting if we have anything, otherwise just return amount1
-        if (amount1 > 0) {
-            uint256 daiCurveOut = curve.get_dy_underlying(0, 1, amount1);
-            return daiCurveOut.add(amount0);
+        (uint256 daiBalance, uint256 fraxBalance) = principal();
+        // only bother adding/converting if we have anything, otherwise just return fraxBalance
+        if (fraxBalance > 0) {
+            uint256 daiCurveOut = curve.get_dy_underlying(0, 1, fraxBalance);
+            return daiCurveOut.add(daiBalance);
         } else {
-            return amount0;
+            return daiBalance;
         }
     }
 
@@ -400,8 +400,12 @@ contract StrategyFraxUniswapDAI is BaseStrategy {
         // check if we have enough free funds to cover the withdrawal
         uint256 wantBal = balanceOfWant();
         if (wantBal < _amountNeeded) {
+            // make sure our pool is healthy enough for a normal withdrawal
+            checkFraxPeg();
+
             // We need to withdraw to get back more want
             _withdrawSome(_amountNeeded.sub(wantBal));
+
             // reload balance of want after withdrawing funds
             wantBal = balanceOfWant();
         }
@@ -461,9 +465,6 @@ contract StrategyFraxUniswapDAI is BaseStrategy {
             return;
         }
 
-        // make sure our pool is healthy enough for a normal withdrawal
-        checkFraxPeg();
-
         // NFT has to be unlocked before we can do anything with it
         require(block.timestamp > nftUnlockTime, "Wait for NFT to unlock!");
 
@@ -472,7 +473,8 @@ contract StrategyFraxUniswapDAI is BaseStrategy {
 
         // use our "ideal" amount for this so we under-estimate and assess losses on each debt reduction
         // calculate the share of the NFT that our amount needed should be
-        uint256 optimisticBal = balanceOfNFToptimistic();
+        uint256 debt = vault.strategies(address(this)).totalDebt;
+        uint256 optimisticBal = Math.max(balanceOfNFToptimistic(), debt);
         uint256 fraction;
         if (optimisticBal > 0) {
             // don't want to divide by 0
@@ -582,12 +584,15 @@ contract StrategyFraxUniswapDAI is BaseStrategy {
     }
 
     ///@notice This allows us to decide to automatically re-lock our NFT with profits after a harvest
-    function setManagerParams(bool _reLockProfits, bool _checkTrueHoldings)
-        external
-        onlyVaultManagers
-    {
+    function setManagerParams(
+        bool _reLockProfits,
+        bool _checkTrueHoldings,
+        uint256 _slippageMax
+    ) external onlyVaultManagers {
+        require(_slippageMax < 10001, "10000 = 100% slippage");
         reLockProfits = _reLockProfits;
         checkTrueHoldings = _checkTrueHoldings;
+        slippageMax = _slippageMax;
     }
 
     ///@notice This allows us to manually harvest with our keeper as needed
