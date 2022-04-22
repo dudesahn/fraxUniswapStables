@@ -319,6 +319,17 @@ def test_odds_and_ends_rekt(
     token.transfer(whale, token.balanceOf(strategy), {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
 
+    # reset our nftID to 1 since we sent away our NFT
+    strategy.setGovParams(
+        strategy.refer(),
+        strategy.voter(),
+        0,
+        1,
+        86400,
+        strategy.nftUnlockTime(),
+        {"from": gov},
+    )
+
     # simulate 1 day of earnings
     chain.sleep(86400)
     chain.mine(1)
@@ -374,6 +385,17 @@ def test_odds_and_ends_liquidate_rekt(
     nft_contract.transferFrom(strategy, whale, strategy.nftId(), {"from": strategy})
     token.transfer(whale, token.balanceOf(strategy), {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
+
+    # reset our nftID to 1 since we sent away our NFT
+    strategy.setGovParams(
+        strategy.refer(),
+        strategy.voter(),
+        0,
+        1,
+        86400,
+        strategy.nftUnlockTime(),
+        {"from": gov},
+    )
 
     # simulate 1 day of earnings
     chain.sleep(86400)

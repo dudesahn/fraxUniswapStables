@@ -22,9 +22,17 @@ def test_revoke_strategy_from_vault(
     strategy.harvest({"from": gov})
 
     # wait a day
+    chain.sleep(86401)
+    chain.mine(1)
+
+    # harvest to get some earnings going
+    harvest = strategy.harvest({"from": gov})
+
+    # wait a day
     chain.sleep(86400)
     chain.mine(1)
 
+    # revoking a strategy from the vault sets the debtRatio to 0
     vaultAssets_starting = vault.totalAssets()
     vault_holdings_starting = token.balanceOf(vault)
     strategy_starting = strategy.estimatedTotalAssets()
@@ -33,19 +41,20 @@ def test_revoke_strategy_from_vault(
     # turn off health check since we will be taking a loss
     chain.sleep(1)
     strategy.setDoHealthCheck(False, {"from": gov})
+    print(
+        "Here's what our strategy owes the vault (debt):",
+        vault.strategies(strategy)["totalDebt"] / (10 ** token.decimals()),
+    )
     harvest = strategy.harvest({"from": gov})
     print("This is our harvest info after revoking:", harvest.events["Harvested"])
     chain.sleep(1)
     vaultAssets_after_revoke = vault.totalAssets()
-
-    # our share price should be below 1 since we took a loss only
-    assert vault.pricePerShare() < 10 ** token.decimals()
     print("Vault share price", vault.pricePerShare() / (10 ** token.decimals()))
 
-    # confirm we made money, or at least that we have lost less than 1% due to slippage
+    # confirm we made money, or at least that we have lost less than 1% due to slippage. also, we shouldn't have much left in our strat.
     assert vaultAssets_after_revoke >= vaultAssets_starting * 0.99
     assert token.balanceOf(vault) >= vault_holdings_starting + strategy_starting
-    assert strategy.estimatedTotalAssets() == 0
+    assert strategy.estimatedTotalAssets() < 10 ** token.decimals()
 
     # simulate a day of waiting for share price to bump back up
     chain.sleep(86400)

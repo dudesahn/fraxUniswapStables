@@ -33,15 +33,25 @@ def test_change_debt(
     slippage = (virtual_balance - real_balance) / real_balance
     print("\nHere's how much is in our NFT (pessimistic):", real_balance)
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
+    print(
+        "Here's what our strategy owes the vault (debt):",
+        vault.strategies(strategy)["totalDebt"] / (10 ** token.decimals()),
+    )
     print("This is our slippage:", "{:.4%}".format(slippage))
 
     # debtRatio is in BPS (aka, max is 10,000, which represents 100%), and is a fraction of the funds that can be in the strategy
     currentDebt = 10000
+
+    # reduce our debtRatio to 50%
     vault.updateStrategyDebtRatio(strategy, currentDebt / 2, {"from": gov})
 
     # sleep for a day to make sure our NFT is unlocked
     chain.sleep(86400)
-    tx = strategy.harvest({"from": gov})
+
+    # turn off health check since we will take a loss here
+    strategy.setDoHealthCheck(False, {"from": gov})
+    harvest = strategy.harvest({"from": gov})
+    print("The is our harvest info:", harvest.events["Harvested"])
     chain.sleep(1)
 
     assert strategy.estimatedTotalAssets() <= startingStrategy
@@ -56,6 +66,10 @@ def test_change_debt(
     slippage = (virtual_balance - real_balance) / real_balance
     print("\nHere's how much is in our NFT (pessimistic):", real_balance)
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
+    print(
+        "Here's what our strategy owes the vault (debt):",
+        vault.strategies(strategy)["totalDebt"] / (10 ** token.decimals()),
+    )
     print("This is our slippage:", "{:.4%}".format(slippage))
 
     # simulate one day of earnings
@@ -79,13 +93,14 @@ def test_change_debt(
     slippage = (virtual_balance - real_balance) / real_balance
     print("\nHere's how much is in our NFT (pessimistic):", real_balance)
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
+    print(
+        "Here's what our strategy owes the vault (debt):",
+        vault.strategies(strategy)["totalDebt"] / (10 ** token.decimals()),
+    )
     print("This is our slippage:", "{:.4%}".format(slippage))
 
     # evaluate our current total assets
     new_assets = vault.totalAssets()
-
-    # confirm we made money, or at least that we have about the same
-    assert new_assets >= old_assets
 
     # simulate a day of waiting for share price to bump back up
     chain.sleep(86400)
@@ -95,5 +110,8 @@ def test_change_debt(
     tx = vault.withdraw(amount, whale, 10_000, {"from": whale})
     loss = startingWhale - token.balanceOf(whale)
     print("Losses from withdrawal slippage:", loss / (10 ** token.decimals()))
-    assert vault.pricePerShare() > 10 ** token.decimals()
-    print("Vault share price", vault.pricePerShare() / (10 ** token.decimals()))
+
+    # check that we haven't lost anything significant from slippage
+    share_price = vault.pricePerShare() / (10 ** token.decimals())
+    print("Vault share price", share_price)
+    assert share_price > 0.995

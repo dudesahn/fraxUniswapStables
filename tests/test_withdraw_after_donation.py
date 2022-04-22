@@ -288,7 +288,7 @@ def test_withdraw_after_donation_4(
     assert new_params["totalLoss"] <= vault.totalAssets() * (1 - slippage)
 
     # check to make sure that our debtRatio is about half of our previous debt
-    assert new_params["debtRatio"] == currentDebt / 2
+    assert math.isclose(new_params["debtRatio"], currentDebt / 2, abs_tol=5)
 
     # assert that our vault total assets, multiplied by our debtRatio, is about equal to our estimated total assets plus credit available (within our slippage)
     # we multiply this by the debtRatio of our strategy out of 10_000 total

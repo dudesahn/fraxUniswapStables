@@ -186,13 +186,13 @@ contract StrategyFraxUniswapDAI is BaseStrategy {
         }
     }
 
-    // returns balance of our UniV3 LP, assuming 1 FRAX = 1 want
+    // returns balance of our UniV3 LP, assuming 1 FRAX = 1 want, factoring curve swap fee
     function balanceOfNFToptimistic() public view returns (uint256) {
         (uint256 daiBalance, uint256 fraxBalance) = principal();
-        return daiBalance.add(fraxBalance);
+        return daiBalance.add(fraxBalance).mul(9996).div(DENOMINATOR);
     }
 
-    // returns balance of our UniV3 LP, swapping all FRAX to want using Curve
+    /// @notice Returns balance of our UniV3 LP, swapping all FRAX to want using Curve. If FRAX is ever worth more than 1 DAI, then the naming doesn't hold up as well.
     function balanceOfNFTpessimistic() public view returns (uint256) {
         (uint256 daiBalance, uint256 fraxBalance) = principal();
         // only bother adding/converting if we have anything, otherwise just return fraxBalance
@@ -272,6 +272,8 @@ contract StrategyFraxUniswapDAI is BaseStrategy {
                 _loss = debt.sub(assets);
                 _profit = 0;
             }
+            // reset since we've adjusted for our true holdings
+            checkTrueHoldings = false;
         } else {
             // check our peg to make sure everything is okay
             checkFraxPeg();
@@ -462,6 +464,8 @@ contract StrategyFraxUniswapDAI is BaseStrategy {
         // check if we have enough free FRAX to cover the extra needed
         if (valueOfFrax() > _amount) {
             _curveSwapToWant(fraxBalance());
+            return;
+        } else if (nftId == 1) {
             return;
         }
 
