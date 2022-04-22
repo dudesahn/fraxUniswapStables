@@ -162,7 +162,7 @@ def test_simple_harvest(
     chain.mine(1)
 
     # turn off auto-restake since we want to withdraw after this harvest
-    strategy.setManagerParams(False, False, {"from": gov})
+    strategy.setManagerParams(False, False, 50, {"from": gov})
     harvest = strategy.harvest({"from": gov})
     print("The is our harvest info:", harvest.events["Harvested"])
 
@@ -242,17 +242,24 @@ def test_simple_harvest_with_uni_fees(
     token.approve(uni_router, 2**256 - 1, {"from": whale})
     frax.approve(uni_router, 2**256 - 1, {"from": whale})
     print("\nLet's do some trading!")
-    to_swap = (
+    want_to_swap = (
         token.balanceOf(whale) / 15
     )  # whale has like $200m USDC, we don't need to do that lol
     # note that if we do enough, we will drain all FRAX, and then won't get any more rewards from the staking pool
     for i in range(3):
-        exact_input = (packed_path_token, whale.address, 2**256 - 1, to_swap, 1)
+        exact_input = (packed_path_token, whale.address, 2**256 - 1, want_to_swap, 1)
         uni_router.exactInput(exact_input, {"from": whale})
         chain.sleep(1)
         chain.mine(1)
-        to_swap = frax.balanceOf(whale)
-        exact_input_frax = (packed_path_frax, whale.address, 2**256 - 1, to_swap, 1)
+        print("Sold USDC for round", i)
+        frax_to_swap = frax.balanceOf(whale)
+        exact_input_frax = (
+            packed_path_frax,
+            whale.address,
+            2**256 - 1,
+            frax_to_swap,
+            1,
+        )
         uni_router.exactInput(exact_input_frax, {"from": whale})
         print("Done with round", i)
         chain.sleep(1)
@@ -319,7 +326,7 @@ def test_simple_harvest_with_uni_fees(
     chain.mine(1)
 
     # turn off auto-restake since we want to withdraw after this harvest
-    strategy.setManagerParams(False, False, {"from": gov})
+    strategy.setManagerParams(False, False, 50, {"from": gov})
     harvest = strategy.harvest({"from": gov})
     print("\nThe is our harvest info:", harvest.events["Harvested"])
 
@@ -413,12 +420,12 @@ def test_simple_harvest_imbalanced_pool(
     token.approve(uni_router, 2**256 - 1, {"from": whale})
     frax.approve(uni_router, 2**256 - 1, {"from": whale})
     print("\nLet's do some trading!")
-    to_swap = (
+    want_to_swap = (
         token.balanceOf(whale) / 15
     )  # whale has like $200m USDC, we don't need to do that lol
     # note that if we do enough, we will drain all FRAX, and then won't get any more rewards from the staking pool
     for i in range(3):
-        exact_input = (packed_path_token, whale.address, 2**256 - 1, to_swap, 1)
+        exact_input = (packed_path_token, whale.address, 2**256 - 1, want_to_swap, 1)
         uni_router.exactInput(exact_input, {"from": whale})
         chain.sleep(1)
         chain.mine(1)
@@ -501,7 +508,7 @@ def test_simple_harvest_imbalanced_pool(
     chain.mine(1)
 
     # turn off auto-restake since we want to withdraw after this harvest
-    strategy.setManagerParams(False, False, {"from": gov})
+    strategy.setManagerParams(False, False, 50, {"from": gov})
     harvest = strategy.harvest({"from": gov})
     print("\nThe is our harvest info:", harvest.events["Harvested"])
 
@@ -604,9 +611,9 @@ def test_simple_harvest_imbalanced_pool_check_holdings(
     token.approve(uni_router, 2**256 - 1, {"from": whale})
     frax.approve(uni_router, 2**256 - 1, {"from": whale})
     print("\nLet's do some trading!")
-    to_swap = token.balanceOf(whale) / 5  # whale drains the FRAX/USDC LP
+    want_to_swap = token.balanceOf(whale) / 5  # whale drains the FRAX/USDC LP
     for i in range(2):
-        exact_input = (packed_path_token, whale.address, 2**256 - 1, to_swap, 1)
+        exact_input = (packed_path_token, whale.address, 2**256 - 1, want_to_swap, 1)
         uni_router.exactInput(exact_input, {"from": whale})
         chain.sleep(1)
         chain.mine(1)
@@ -650,16 +657,17 @@ def test_simple_harvest_imbalanced_pool_check_holdings(
     chain.mine(1)
 
     # try to check our true holdings to see this profit
-    tx = strategy.setManagerParams(True, True, {"from": gov})
+    tx = strategy.setManagerParams(True, True, 50, {"from": gov})
 
     # harvest, store new asset amount
     chain.sleep(1)
+    strategy.setDoHealthCheck(False, {"from": gov})
     harvest = strategy.harvest({"from": gov})
     print("The is our harvest info:", harvest.events["Harvested"])
     chain.sleep(1)
     new_assets = vault.totalAssets()
     # confirm we made money, or at least that we have about the same
-    assert new_assets >= old_assets
+    assert new_assets >= old_assets * 0.99
     print("\nVault total assets after harvest: ", new_assets / (10 ** token.decimals()))
     print(
         "Strategy total assets:",
@@ -692,7 +700,7 @@ def test_simple_harvest_imbalanced_pool_check_holdings(
     chain.mine(1)
 
     # turn off auto-restake since we want to withdraw after this harvest
-    # strategy.setManagerParams(False, False, {"from": gov})
+    # strategy.setManagerParams(False, False, 50, {"from": gov})
     harvest = strategy.harvest({"from": gov})
     print("\nThe is our harvest info:", harvest.events["Harvested"])
 

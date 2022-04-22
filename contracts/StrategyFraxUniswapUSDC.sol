@@ -186,14 +186,14 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         }
     }
 
-    // returns balance of our UniV3 LP, assuming 1 FRAX = 1 want
+    // returns balance of our UniV3 LP, assuming 1 FRAX = 1 want, factoring curve swap fee
     function balanceOfNFToptimistic() public view returns (uint256) {
         (uint256 fraxBalance, uint256 usdcBalance) = principal();
-        uint256 fraxRebase = fraxBalance.div(1e12); // div by 1e12 to convert frax to usdc
+        uint256 fraxRebase = fraxBalance.div(1e12).mul(9996).div(DENOMINATOR); // div by 1e12 to convert frax to usdc, assume 1:1 swap on curve with fees
         return fraxRebase.add(usdcBalance);
     }
 
-    // returns balance of our UniV3 LP, swapping all FRAX to want using Curve
+    /// @notice Returns balance of our UniV3 LP, swapping all FRAX to want using Curve. If FRAX is ever worth more than 1 USDC, then the naming doesn't hold up as well.
     function balanceOfNFTpessimistic() public view returns (uint256) {
         (uint256 fraxBalance, uint256 usdcBalance) = principal();
         // only bother adding/converting if we have anything, otherwise just return usdcBalance
@@ -273,6 +273,8 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
                 _loss = debt.sub(assets);
                 _profit = 0;
             }
+            // reset since we've adjusted for our true holdings
+            checkTrueHoldings = false;
         } else {
             // check our peg to make sure everything is okay
             checkFraxPeg();
@@ -469,6 +471,8 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         // check if we have enough free FRAX to cover the extra needed
         if (valueOfFrax() > _amount) {
             _curveSwapToWant(fraxBalance());
+            return;
+        } else if (nftId == 1) {
             return;
         }
 

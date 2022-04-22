@@ -29,19 +29,41 @@ def test_change_debt_with_profit(
     slippage = (virtual_balance - real_balance) / real_balance
     print("\nHere's how much is in our NFT (pessimistic):", real_balance)
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
+    print(
+        "Here's what our strategy owes the vault (debt):",
+        vault.strategies(strategy)["totalDebt"] / (10 ** token.decimals()),
+    )
     print("This is our slippage:", "{:.4%}".format(slippage))
 
     prev_params = vault.strategies(strategy)
-
     currentDebt = vault.strategies(strategy)["debtRatio"]
     vault.updateStrategyDebtRatio(strategy, currentDebt / 2, {"from": gov})
     assert vault.strategies(strategy)["debtRatio"] == 5000
 
-    # turn off health check since we're about to take a big profit
-    strategy.setDoHealthCheck(False, {"from": gov})
+    # our whale donates some funds so we get a nice profit, what a good person
+    to_donate = amount / 2
+    token.transfer(strategy, to_donate, {"from": whale})
+    print("This is our donation:", to_donate / (10 ** token.decimals()))
+
+    # normally, this would lead us to take a big profit, but not without checking our true holdings in this case
     chain.sleep(1)
     harvest = strategy.harvest({"from": gov})
     print("\nThe is our harvest info:", harvest.events["Harvested"])
+    print("Strategy free USDC:", token.balanceOf(strategy) / (10 ** token.decimals()))
+
+    # sleep for a day to make sure our NFT is unlocked
+    chain.sleep(86400)
+
+    # we missed that profit, better check our true holdings
+    strategy.setManagerParams(True, True, 50, {"from": gov})
+    strategy.setDoHealthCheck(False, {"from": gov})
+    chain.sleep(1)
+    harvest = strategy.harvest({"from": gov})
+    print(
+        "\nThe is our harvest info after checking true holdings, should have a profit ~equal to donation:",
+        harvest.events["Harvested"],
+    )
+    assert harvest.events["Harvested"]["profit"] > to_donate * 0.99
 
     # check on our NFT LP
     real_balance = strategy.balanceOfNFTpessimistic() / (10 ** token.decimals())
@@ -49,6 +71,10 @@ def test_change_debt_with_profit(
     slippage = (virtual_balance - real_balance) / real_balance
     print("\nHere's how much is in our NFT (pessimistic):", real_balance)
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
+    print(
+        "Here's what our strategy owes the vault (debt):",
+        vault.strategies(strategy)["totalDebt"] / (10 ** token.decimals()),
+    )
     print("This is our slippage:", "{:.4%}".format(slippage))
 
     new_params = vault.strategies(strategy)

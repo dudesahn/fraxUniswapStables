@@ -136,7 +136,7 @@ def test_emergency_exit_with_no_gain_or_loss(
     chain.sleep(1)
 
     # make sure we don't re-lock our NFT so we can send it away
-    strategy.setManagerParams(False, False, {"from": gov})
+    strategy.setManagerParams(False, False, 50, {"from": gov})
     strategy.harvest({"from": gov})
     chain.mine(1)
     chain.sleep(1)

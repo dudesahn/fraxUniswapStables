@@ -63,7 +63,7 @@ def test_triggers(
     chain.mine(1)
 
     # turn off auto-locking
-    strategy.setManagerParams(False, False, {"from": gov})
+    strategy.setManagerParams(False, False, 50, {"from": gov})
     strategy.harvest({"from": gov})
 
     # withdraw and check on our losses (due to slippage on big swaps in/out)
