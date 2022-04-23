@@ -17,7 +17,7 @@ def test_simple_harvest(
     strategist_ms,
     amount,
     accounts,
-    frax,
+    dai,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -37,10 +37,10 @@ def test_simple_harvest(
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
     print(
-        "\nDust left in strategy\nDAI:",
+        "\nDust left in strategy\nFRAX:",
         strategy.balanceOfWant() / (10 ** token.decimals()),
-        "\nFRAX:",
-        strategy.fraxBalance() / 1e18,
+        "\nDAI:",
+        strategy.balanceOfDai() / 1e18,
     )
 
     strategy.harvest({"from": gov})
@@ -55,10 +55,10 @@ def test_simple_harvest(
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
     print(
-        "\nDust left in strategy\nDAI:",
+        "\nDust left in strategy\nFRAX:",
         strategy.balanceOfWant() / (10 ** token.decimals()),
-        "\nFRAX:",
-        strategy.fraxBalance() / 1e18,
+        "\nDAI:",
+        strategy.balanceOfDai() / 1e18,
     )
 
     old_assets = vault.totalAssets()
@@ -88,10 +88,10 @@ def test_simple_harvest(
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
     print(
-        "\nDust left in strategy\nDAI:",
+        "\nDust left in strategy\nFRAX:",
         strategy.balanceOfWant() / (10 ** token.decimals()),
-        "\nFRAX:",
-        strategy.fraxBalance() / 1e18,
+        "\nDAI:",
+        strategy.balanceOfDai() / 1e18,
     )
 
     # Display estimated APR
@@ -123,10 +123,10 @@ def test_simple_harvest(
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
     print(
-        "\nDust left in strategy\nDAI:",
+        "\nDust left in strategy\nFRAX:",
         strategy.balanceOfWant() / (10 ** token.decimals()),
-        "\nFRAX:",
-        strategy.fraxBalance() / 1e18,
+        "\nDAI:",
+        strategy.balanceOfDai() / 1e18,
     )
 
     # simulate one day, since that's how long we lock for
@@ -151,10 +151,10 @@ def test_simple_harvest(
     print("Here's how much is in our NFT (optimistic):", virtual_balance)
     print("This is our slippage:", "{:.4%}".format(slippage))
     print(
-        "\nDust left in strategy\nDAI:",
+        "\nDust left in strategy\nFRAX:",
         strategy.balanceOfWant() / (10 ** token.decimals()),
-        "\nFRAX:",
-        strategy.fraxBalance() / 1e18,
+        "\nDAI:",
+        strategy.balanceOfDai() / 1e18,
     )
 
     # simulate one day, since that's how long we lock for
@@ -190,7 +190,7 @@ def test_simple_harvest_with_uni_fees(
     strategist_ms,
     amount,
     accounts,
-    frax,
+    dai,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -233,39 +233,39 @@ def test_simple_harvest_with_uni_fees(
     print("\nStrategy locked liquidity:", locked)
 
     # have our whale trade in the uniV3 pool a bunch to generate some fees
-    uni_values_token = [token.address, 500, frax.address]
-    uni_values_frax = [frax.address, 500, token.address]
+    uni_values_dai = [dai.address, 500, token.address]
+    uni_values_frax = [token.address, 500, dai.address]
     uni_types = ("address", "uint24", "address")
-    packed_path_token = encode_abi_packed(uni_types, uni_values_token)
+    packed_path_dai = encode_abi_packed(uni_types, uni_values_dai)
     packed_path_frax = encode_abi_packed(uni_types, uni_values_frax)
     uni_router = Contract("0xE592427A0AEce92De3Edee1F18E0157C05861564")
     token.approve(uni_router, 2**256 - 1, {"from": whale})
-    frax.approve(uni_router, 2**256 - 1, {"from": whale})
+    dai.approve(uni_router, 2**256 - 1, {"from": whale})
     print("\nLet's do some trading!")
     want_to_swap = (
         token.balanceOf(whale) / 15
     )  # whale has like $1b DAI, we don't need to do that lol
     # note that if we do enough, we will drain all FRAX, and then won't get any more rewards from the staking pool
     for i in range(3):
-        exact_input = (packed_path_token, whale.address, 2**256 - 1, want_to_swap, 1)
+        exact_input = (packed_path_frax, whale.address, 2**256 - 1, want_to_swap, 1)
         uni_router.exactInput(exact_input, {"from": whale})
         chain.sleep(1)
         chain.mine(1)
-        frax_to_swap = frax.balanceOf(whale)
-        exact_input_frax = (
-            packed_path_frax,
+        dai_to_swap = dai.balanceOf(whale)
+        exact_input_dai = (
+            packed_path_dai,
             whale.address,
             2**256 - 1,
-            frax_to_swap,
+            dai_to_swap,
             1,
         )
-        uni_router.exactInput(exact_input_frax, {"from": whale})
+        uni_router.exactInput(exact_input_dai, {"from": whale})
         print("Done with round", i)
         chain.sleep(1)
         chain.mine(1)
 
     tradingLosses = newWhale - token.balanceOf(whale)
-    print("DAI lost trading", tradingLosses / (10 ** token.decimals()))
+    print("FRAX lost trading", tradingLosses / (10 ** token.decimals()))
 
     # check on our NFT LP
     real_balance = strategy.balanceOfNFTpessimistic() / (10 ** token.decimals())
@@ -367,7 +367,7 @@ def test_simple_harvest_imbalanced_pool(
     strategist_ms,
     amount,
     accounts,
-    frax,
+    dai,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -410,28 +410,28 @@ def test_simple_harvest_imbalanced_pool(
     print("\nStrategy locked liquidity:", locked)
 
     # have our whale trade in the uniV3 pool a bunch to generate some fees
-    uni_values_token = [token.address, 500, frax.address]
-    uni_values_frax = [frax.address, 500, token.address]
+    uni_values_dai = [dai.address, 500, token.address]
+    uni_values_frax = [token.address, 500, dai.address]
     uni_types = ("address", "uint24", "address")
-    packed_path_token = encode_abi_packed(uni_types, uni_values_token)
+    packed_path_dai = encode_abi_packed(uni_types, uni_values_dai)
     packed_path_frax = encode_abi_packed(uni_types, uni_values_frax)
     uni_router = Contract("0xE592427A0AEce92De3Edee1F18E0157C05861564")
     token.approve(uni_router, 2**256 - 1, {"from": whale})
-    frax.approve(uni_router, 2**256 - 1, {"from": whale})
+    dai.approve(uni_router, 2**256 - 1, {"from": whale})
     print("\nLet's do some trading!")
     want_to_swap = (
         token.balanceOf(whale) / 80
     )  # whale has like $1b DAI, we don't need to do that lol
     # note that if we do enough, we will drain all FRAX, and then won't get any more rewards from the staking pool
     for i in range(3):
-        exact_input = (packed_path_token, whale.address, 2**256 - 1, want_to_swap, 1)
+        exact_input = (packed_path_frax, whale.address, 2**256 - 1, want_to_swap, 1)
         uni_router.exactInput(exact_input, {"from": whale})
         chain.sleep(1)
         chain.mine(1)
         print("Done with round", i)
 
     tradingLosses = newWhale - token.balanceOf(whale)
-    print("DAI lost trading", tradingLosses / (10 ** token.decimals()))
+    print("FRAX lost trading", tradingLosses / (10 ** token.decimals()))
 
     nft_holdings = strategy.principal()
     print(
@@ -558,7 +558,7 @@ def test_simple_harvest_imbalanced_pool_check_holdings(
     strategist_ms,
     amount,
     accounts,
-    frax,
+    dai,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -601,28 +601,28 @@ def test_simple_harvest_imbalanced_pool_check_holdings(
     print("\nStrategy locked liquidity:", locked)
 
     # have our whale trade in the uniV3 pool a bunch to generate some fees
-    uni_values_token = [token.address, 500, frax.address]
-    uni_values_frax = [frax.address, 500, token.address]
+    uni_values_dai = [dai.address, 500, token.address]
+    uni_values_frax = [token.address, 500, dai.address]
     uni_types = ("address", "uint24", "address")
-    packed_path_token = encode_abi_packed(uni_types, uni_values_token)
+    packed_path_dai = encode_abi_packed(uni_types, uni_values_dai)
     packed_path_frax = encode_abi_packed(uni_types, uni_values_frax)
     uni_router = Contract("0xE592427A0AEce92De3Edee1F18E0157C05861564")
     token.approve(uni_router, 2**256 - 1, {"from": whale})
-    frax.approve(uni_router, 2**256 - 1, {"from": whale})
+    dai.approve(uni_router, 2**256 - 1, {"from": whale})
     print("\nLet's do some trading!")
     want_to_swap = (
         token.balanceOf(whale) / 80
-    )  # whale has like $1b DAI, we don't need to do that lol
-    # note that if we do enough, we will drain all FRAX, and then won't get any more rewards from the staking pool
+    )  # whale has like $200m FRAX, we don't need to do that lol
+    # note that if we do enough, we will drain all DAI, and then won't get any more rewards from the staking pool
     for i in range(3):
-        exact_input = (packed_path_token, whale.address, 2**256 - 1, want_to_swap, 1)
+        exact_input = (packed_path_frax, whale.address, 2**256 - 1, want_to_swap, 1)
         uni_router.exactInput(exact_input, {"from": whale})
         chain.sleep(1)
         chain.mine(1)
         print("Done with round", i)
 
     tradingLosses = newWhale - token.balanceOf(whale)
-    print("DAI lost trading", tradingLosses / (10 ** token.decimals()))
+    print("FRAX lost trading", tradingLosses / (10 ** token.decimals()))
 
     nft_holdings = strategy.principal()
     print(

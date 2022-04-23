@@ -12,6 +12,7 @@ def test_emergency_exit(
     strategy,
     chain,
     amount,
+    dai,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -89,6 +90,11 @@ def test_emergency_exit_with_profit(
     strategy.setDoHealthCheck(False, {"from": gov})
     strategy.setEmergencyExit({"from": gov})
     chain.sleep(1)
+
+    # use this to make sure we can access the donated funds
+    strategy.setManagerParams(True, True, 50, {"from": gov})
+
+    # harvest!
     tx = strategy.harvest({"from": gov})
     print("This is our harvest detail:", tx.events["Harvested"])
     harvest_profit = tx.events["Harvested"]["profit"]

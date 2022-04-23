@@ -34,8 +34,8 @@ def tests_using_tenderly():
 @pytest.fixture(scope="module")
 def whale(accounts):
     # Totally in it for the tech
-    # Update this with a large holder of your want token (the largest EOA holder of DAI, avax bridge)
-    whale = accounts.at("0xE78388b4CE79068e89Bf8aA7f218eF6b9AB0e9d0", force=True)
+    # Update this with a large holder of your want token (the largest EOA holder of FRAX, fantom bridge)
+    whale = accounts.at("0xC564EE9f21Ed8A2d8E7e76c085740d5e4c5FaFbE", force=True)
     yield whale
 
 
@@ -50,13 +50,13 @@ def amount():
 @pytest.fixture(scope="module")
 def token():
     # this should be the address of the ERC-20 used by the strategy/vault
-    token_address = "0x6B175474E89094C44Da98b954EedeAC495271d0F"
+    token_address = "0x853d955aCEf822Db058eb8505911ED77F175b99e"
     yield Contract(token_address)
 
 
 @pytest.fixture(scope="module")
-def frax():
-    yield Contract("0x853d955acef822db058eb8505911ed77f175b99e")
+def dai():
+    yield Contract("0x6B175474E89094C44Da98b954EedeAC495271d0F")
 
 
 # Only worry about changing things above this line, unless you want to make changes to the vault or strategy.
@@ -157,7 +157,7 @@ def vault(pm, gov, rewards, guardian, management, token, chain):
 # replace the first value with the name of your strategy
 @pytest.fixture(scope="function")
 def strategy(
-    StrategyFraxUniswapDAI,
+    StrategyFraxUniswapFRAXDAI,
     strategist,
     keeper,
     vault,
@@ -172,7 +172,7 @@ def strategy(
 ):
     # make sure to include all constructor parameters needed here
     strategy = strategist.deploy(
-        StrategyFraxUniswapDAI,
+        StrategyFraxUniswapFRAXDAI,
         vault,
     )
     strategy.setKeeper(keeper, {"from": gov})
