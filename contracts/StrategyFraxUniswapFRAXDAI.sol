@@ -398,16 +398,24 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
     {
         // check if we have enough free funds to cover the withdrawal
         uint256 wantBal = balanceOfWant();
+
         if (wantBal < _amountNeeded) {
-            // make sure our pool is healthy enough for a normal withdrawal
-            checkFraxPeg();
+            uint256 toFree = _amountNeeded.sub(wantBal);
 
-            // We need to withdraw to get back more want
-            _withdrawSome(_amountNeeded.sub(wantBal));
+            // check if we have enough free DAI to cover the extra needed
+            if (valueOfDai() >= toFree) {
+                _curveSwapToFrax(balanceOfDai());
+            } else {
+                // make sure our pool is healthy enough for a normal withdrawal
+                checkFraxPeg();
 
-            // reload balance of want after withdrawing funds
-            wantBal = balanceOfWant();
+                // We need to withdraw to get back more want
+                _withdrawSome(_amountNeeded.sub(toFree));
+            }
         }
+        // reload balance of want after withdrawing funds
+        wantBal = balanceOfWant();
+
         // check again if we have enough balance available to cover the liquidation
         if (wantBal >= _amountNeeded) {
             _liquidatedAmount = _amountNeeded;
@@ -423,8 +431,10 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
         override
         returns (uint256 _amountFreed)
     {
-        uint256 toLiquidate = estimatedTotalAssets();
-        (_amountFreed, ) = liquidatePosition(toLiquidate);
+        // make sure we're liquidating the maximum amount possible
+        uint256 debt = vault.strategies(address(this)).totalDebt;
+        uint256 optimisticBal = Math.max(estimatedTotalAssets(), debt);
+        (_amountFreed, ) = liquidatePosition(optimisticBal);
     }
 
     // before we go crazy withdrawing or harvesting, make sure our FRAX peg is healthy
@@ -458,11 +468,7 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
 
     // withdraw some want from the vaults, probably don't want to allow users to initiate this
     function _withdrawSome(uint256 _amount) internal {
-        // check if we have enough free DAI to cover the extra needed
-        if (valueOfDai() > _amount) {
-            _curveSwapToFrax(balanceOfDai());
-            return;
-        } else if (nftId == 1) {
+        if (nftId == 1) {
             return;
         }
 
@@ -618,9 +624,9 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
             "can't mint"
         );
 
-        // swap half to frax, don't care about using real pricing since it's a small amount
-        // and is only meant to seed the LP
-        uint256 swapAmt = balanceOfWant().div(2);
+        // swap some to dai, don't care about using real pricing since it's a small amount
+        // and is only meant to seed the LP. prefer extra want left over for accounting reasons.
+        uint256 swapAmt = balanceOfWant().mul(40).div(100);
         _curveSwapToDai(swapAmt);
 
         IUniNFT.nftStruct memory setNFT =

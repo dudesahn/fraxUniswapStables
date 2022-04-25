@@ -9,7 +9,7 @@ def isolation(fn_isolation):
 
 
 # set this for if we want to use tenderly or not; mostly helpful because with brownie.reverts fails in tenderly forks.
-use_tenderly = False
+use_tenderly = True
 
 
 @pytest.fixture(scope="module", autouse=use_tenderly)

@@ -92,7 +92,7 @@ def test_emergency_exit_with_profit(
     chain.sleep(1)
 
     # use this to make sure we can access the donated funds
-    strategy.setManagerParams(True, True, 50, {"from": gov})
+    strategy.setManagerParams(False, True, 50, {"from": gov})
 
     # harvest!
     tx = strategy.harvest({"from": gov})
@@ -101,7 +101,7 @@ def test_emergency_exit_with_profit(
     print("This was our harvest profit:", harvest_profit / (10 ** token.decimals()))
     assert harvest_profit < donation
     chain.sleep(1)
-    assert strategy.estimatedTotalAssets() == 0
+    assert strategy.estimatedTotalAssets() < harvest_profit * 0.001
 
     # simulate a day of waiting for share price to bump back up
     chain.sleep(86400)
@@ -153,6 +153,17 @@ def test_emergency_exit_with_no_gain_or_loss(
     nft_contract.transferFrom(strategy, whale, strategy.nftId(), {"from": strategy})
     token.transfer(whale, token.balanceOf(strategy), {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
+
+    # reset our nftID to 1 since we sent away our NFT
+    strategy.setGovParams(
+        strategy.refer(),
+        strategy.voter(),
+        0,
+        1,
+        86400,
+        strategy.nftUnlockTime(),
+        {"from": gov},
+    )
 
     # have our whale send in exactly our debtOutstanding
     whale_to_give = vault.debtOutstanding(strategy)
