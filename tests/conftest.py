@@ -169,6 +169,7 @@ def strategy(
     strategist_ms,
     whale,
     gas_oracle,
+    tests_using_tenderly,
 ):
     # make sure to include all constructor parameters needed here
     strategy = strategist.deploy(
@@ -195,7 +196,8 @@ def strategy(
     strategy.mintNFT({"from": gov})
 
     # do this for our tenderly verification
-    print("\nThis is our strategy address:", strategy.address)
+    if tests_using_tenderly:
+        print("\nThis is our strategy address:", strategy.address)
 
     yield strategy
 
