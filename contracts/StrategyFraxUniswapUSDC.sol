@@ -171,14 +171,14 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
     }
 
     // returns balance of frax token
-    function fraxBalance() public view returns (uint256) {
+    function balanceOfFrax() public view returns (uint256) {
         return frax.balanceOf(address(this));
     }
 
     /// @notice Returns additional USDC we get if we swap our FRAX on Curve
     function valueOfFrax() public view returns (uint256) {
         // see how much USDC we would get for our FRAX on curve
-        uint256 currentFrax = fraxBalance();
+        uint256 currentFrax = balanceOfFrax();
         if (currentFrax > 0) {
             return curve.get_dy_underlying(0, 2, currentFrax);
         } else {
@@ -193,7 +193,7 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         return fraxRebase.add(usdcBalance);
     }
 
-    /// @notice Returns balance of our UniV3 LP, swapping all FRAX to want using Curve. If FRAX is ever worth more than 1 USDC, then the naming doesn't hold up as well.
+    /// @notice Returns balance of our UniV3 LP, swapping all FRAX to want using Curve.
     function balanceOfNFTpessimistic() public view returns (uint256) {
         (uint256 fraxBalance, uint256 usdcBalance) = principal();
         // only bother adding/converting if we have anything, otherwise just return usdcBalance
@@ -247,7 +247,7 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         }
 
         // convert all of our FRAX profits to USDC for ease of accounting
-        uint256 fraxToSwap = fraxBalance();
+        uint256 fraxToSwap = balanceOfFrax();
         if (fraxToSwap > 0) {
             _curveSwapToWant(fraxToSwap);
         }
@@ -381,7 +381,7 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
                 IUniNFT.increaseStruct memory setIncrease =
                     IUniNFT.increaseStruct(
                         nftId,
-                        fraxBalance(),
+                        balanceOfFrax(),
                         balanceOfWant(),
                         0,
                         0,
@@ -408,12 +408,14 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
     {
         // check if we have enough free funds to cover the withdrawal
         uint256 wantBal = balanceOfWant();
+
         if (wantBal < _amountNeeded) {
             // make sure our pool is healthy enough for a normal withdrawal
             checkFraxPeg();
 
             // We need to withdraw to get back more want
-            _withdrawSome(_amountNeeded.sub(wantBal));
+            uint256 toFree = _amountNeeded.sub(wantBal);
+            _withdrawSome(toFree);
 
             // reload balance of want after withdrawing funds
             wantBal = balanceOfWant();
@@ -433,8 +435,9 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         override
         returns (uint256 _amountFreed)
     {
-        uint256 toLiquidate = estimatedTotalAssets();
-        (_amountFreed, ) = liquidatePosition(toLiquidate);
+        // amount here doesn't really matter, since in withdrawSome we always withdraw everything
+        // if emergencyExit is true, so just use more than we would have loose in the strategy
+        (_amountFreed, ) = liquidatePosition(estimatedTotalAssets());
     }
 
     // before we go crazy withdrawing or harvesting, make sure our FRAX peg is healthy
@@ -468,11 +471,7 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
 
     // withdraw some want from the vaults, probably don't want to allow users to initiate this
     function _withdrawSome(uint256 _amount) internal {
-        // check if we have enough free FRAX to cover the extra needed
-        if (valueOfFrax() > _amount) {
-            _curveSwapToWant(fraxBalance());
-            return;
-        } else if (nftId == 1) {
+        if (nftId == 1) {
             return;
         }
 
@@ -533,7 +532,7 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         IUniNFT(uniNFT).collect(collectParams);
 
         // swap any FRAX we have to USDC
-        uint256 currentFrax = fraxBalance();
+        uint256 currentFrax = balanceOfFrax();
         if (currentFrax > 0) {
             _curveSwapToWant(currentFrax);
         }
@@ -541,7 +540,7 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
 
     // transfers all tokens to new strategy
     function prepareMigration(address _newStrategy) internal override {
-        frax.transfer(_newStrategy, fraxBalance());
+        frax.transfer(_newStrategy, balanceOfFrax());
         fxs.transfer(_newStrategy, fxs.balanceOf(address(this)));
 
         // NFT has to be unlocked before we can do anything with it
@@ -628,9 +627,9 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
             "can't mint"
         );
 
-        // swap half to frax, don't care about using real pricing since it's a small amount
-        // and is only meant to seed the LP
-        uint256 swapAmt = balanceOfWant().div(2);
+        // swap < half to frax, don't care about using real pricing since it's a small amount
+        // and is only meant to seed the LP. prefer extra want left over for accounting reasons.
+        uint256 swapAmt = balanceOfWant().mul(40).div(100);
         _curveSwapToFrax(swapAmt);
 
         IUniNFT.nftStruct memory setNFT =
@@ -640,7 +639,7 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
                 500,
                 (-276380),
                 (-276270),
-                fraxBalance(),
+                balanceOfFrax(),
                 balanceOfWant(),
                 0,
                 0,

@@ -40,7 +40,7 @@ def test_simple_harvest(
         "\nDust left in strategy\nUSDC:",
         strategy.balanceOfWant() / (10 ** token.decimals()),
         "\nFRAX:",
-        strategy.fraxBalance() / 1e18,
+        strategy.balanceOfFrax() / 1e18,
     )
 
     strategy.harvest({"from": gov})
@@ -58,7 +58,7 @@ def test_simple_harvest(
         "\nDust left in strategy\nUSDC:",
         strategy.balanceOfWant() / (10 ** token.decimals()),
         "\nFRAX:",
-        strategy.fraxBalance() / 1e18,
+        strategy.balanceOfFrax() / 1e18,
     )
 
     old_assets = vault.totalAssets()
@@ -91,7 +91,7 @@ def test_simple_harvest(
         "\nDust left in strategy\nUSDC:",
         strategy.balanceOfWant() / (10 ** token.decimals()),
         "\nFRAX:",
-        strategy.fraxBalance() / 1e18,
+        strategy.balanceOfFrax() / 1e18,
     )
 
     # Display estimated APR
@@ -126,7 +126,7 @@ def test_simple_harvest(
         "\nDust left in strategy\nUSDC:",
         strategy.balanceOfWant() / (10 ** token.decimals()),
         "\nFRAX:",
-        strategy.fraxBalance() / 1e18,
+        strategy.balanceOfFrax() / 1e18,
     )
 
     # simulate one day, since that's how long we lock for
@@ -154,7 +154,7 @@ def test_simple_harvest(
         "\nDust left in strategy\nUSDC:",
         strategy.balanceOfWant() / (10 ** token.decimals()),
         "\nFRAX:",
-        strategy.fraxBalance() / 1e18,
+        strategy.balanceOfFrax() / 1e18,
     )
 
     # simulate one day, since that's how long we lock for

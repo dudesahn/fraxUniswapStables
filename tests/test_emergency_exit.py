@@ -103,9 +103,20 @@ def test_emergency_exit_with_profit(
 
     # withdraw and check on our losses (due to slippage on big swaps in/out)
     # this loss should have already been realized on harvest, though, and we removed all funds from strategy so no more slippage.
-    tx = vault.withdraw({"from": whale})
-    loss = startingWhale - token.balanceOf(whale) - donation
-    print("Losses from withdrawal slippage:", loss / (10 ** token.decimals()))
+    # make sure we account for all of the fees that went to the treasury (~20% of a huge profit)
+    treasury = vault.rewards()
+    fees = (vault.balanceOf(treasury) / (10 ** token.decimals())) * (
+        vault.pricePerShare() / (10 ** token.decimals())
+    )
+    vault.withdraw({"from": whale})
+    loss = (startingWhale - token.balanceOf(whale)) / (10 ** token.decimals())
+
+    # check that our loss is ~10% of the donations
+    print(
+        "\n10% of our donation, should be close to losses:",
+        donation * 0.1 / (10 ** token.decimals()),
+    )
+    print("Losses:", loss)
 
     # since we harvested on this loss (wasn't just a withdrawal), but also got a big donation, we should have a profit
     assert vault.pricePerShare() > 10 ** token.decimals()
@@ -147,6 +158,17 @@ def test_emergency_exit_with_no_gain_or_loss(
     nft_contract.transferFrom(strategy, whale, strategy.nftId(), {"from": strategy})
     token.transfer(whale, token.balanceOf(strategy), {"from": strategy})
     assert strategy.estimatedTotalAssets() == 0
+
+    # reset our nftID to 1 since we sent away our NFT
+    strategy.setGovParams(
+        strategy.refer(),
+        strategy.voter(),
+        0,
+        1,
+        86400,
+        strategy.nftUnlockTime(),
+        {"from": gov},
+    )
 
     # have our whale send in exactly our debtOutstanding
     whale_to_give = vault.debtOutstanding(strategy)
