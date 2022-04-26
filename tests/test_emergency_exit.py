@@ -103,7 +103,7 @@ def test_emergency_exit_with_profit(
 
     # withdraw and check on our losses (due to slippage on big swaps in/out)
     # this loss should have already been realized on harvest, though, and we removed all funds from strategy so no more slippage.
-    # make sure we account for all of the fees that went to the treasury (~20% of a huge profit)
+    # make sure we account for all of the fees that went to the treasury (~10% of a huge profit)
     treasury = vault.rewards()
     fees = (vault.balanceOf(treasury) / (10 ** token.decimals())) * (
         vault.pricePerShare() / (10 ** token.decimals())
