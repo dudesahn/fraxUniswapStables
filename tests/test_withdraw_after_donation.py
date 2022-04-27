@@ -191,7 +191,7 @@ def test_withdraw_after_donation_3(
     # have our whale withdraws more than his donation, ensuring we pull from strategy
     # set loss parameter based on our strategy's slippage, we will lose some on slippage that is assessed on withdrawal
     vault.withdraw(
-        donation + amount / 2, whale, strategy.slippageMax(), {"from": whale}
+        donation + donation / 2, whale, strategy.slippageMax(), {"from": whale}
     )
 
     # try to check our true holdings to see this profit
@@ -262,7 +262,7 @@ def test_withdraw_after_donation_4(
     # have our whale withdraws more than his donation, ensuring we pull from strategy
     # set loss parameter based on our strategy's slippage, we will lose some on slippage that is assessed on withdrawal
     vault.withdraw(
-        donation + amount / 2, whale, strategy.slippageMax(), {"from": whale}
+        donation + donation / 2, whale, strategy.slippageMax(), {"from": whale}
     )
 
     # try to check our true holdings to see this profit
@@ -332,7 +332,7 @@ def test_withdraw_after_donation_5(
     # have our whale withdraws more than his donation, ensuring we pull from strategy
     # set loss parameter based on our strategy's slippage, we will lose some on slippage that is assessed on withdrawal
     vault.withdraw(
-        donation + amount / 2, whale, strategy.slippageMax(), {"from": whale}
+        donation + donation / 2, whale, strategy.slippageMax(), {"from": whale}
     )
 
     # try to check our true holdings to see this profit
@@ -463,7 +463,7 @@ def test_withdraw_after_donation_7(
 
     # have our whale withdraws more than his donation, ensuring we pull from strategy
     # set 1% loss parameter, we will lose some on slippage that is assessed on withdrawal
-    withdrawal = donation + amount / 2
+    withdrawal = donation + donation / 2
     vault.withdraw(withdrawal, whale, 100, {"from": whale})
 
     # try to check our true holdings to see this profit
@@ -477,8 +477,13 @@ def test_withdraw_after_donation_7(
     harvest = strategy.harvest({"from": gov})
     new_params = vault.strategies(strategy).dict()
 
-    # check everywhere to make sure we emptied out the strategy
-    assert strategy.estimatedTotalAssets() == 0
+    # check everywhere to make sure we emptied out the strategy, sometimes need a second harvest
+    if strategy.estimatedTotalAssets() > 0:
+        strategy.setDoHealthCheck(False, {"from": gov})
+        chain.sleep(1)
+        harvest = strategy.harvest({"from": gov})
+        new_params = vault.strategies(strategy).dict()
+        assert strategy.estimatedTotalAssets() == 0
     assert token.balanceOf(strategy) == 0
     current_assets = vault.totalAssets()
 
@@ -551,7 +556,12 @@ def test_withdraw_after_donation_8(
     harvest = strategy.harvest({"from": gov})
     new_params = vault.strategies(strategy).dict()
 
-    # check everywhere to make sure we emptied out the strategy
+    # check everywhere to make sure we emptied out the strategy, sometimes need a second harvest
+#     if strategy.estimatedTotalAssets() > 0:
+#         strategy.setDoHealthCheck(False, {"from": gov})
+#         chain.sleep(1)
+#         harvest = strategy.harvest({"from": gov})
+#         new_params = vault.strategies(strategy).dict()
     assert strategy.estimatedTotalAssets() == 0
     assert token.balanceOf(strategy) == 0
     current_assets = vault.totalAssets()

@@ -100,8 +100,13 @@ def test_emergency_exit_with_profit(
     harvest_profit = tx.events["Harvested"]["profit"]
     print("This was our harvest profit:", harvest_profit / (10 ** token.decimals()))
     assert harvest_profit < donation
-    chain.sleep(1)
-    assert strategy.estimatedTotalAssets() < harvest_profit * 0.001
+    chain.sleep(1)    
+    # check to make sure we emptied out the strategy, sometimes need a second harvest
+    if strategy.estimatedTotalAssets() > 0:
+        strategy.setDoHealthCheck(False, {"from": gov})
+        chain.sleep(1)
+        harvest = strategy.harvest({"from": gov})
+        assert strategy.estimatedTotalAssets() == 0
 
     # simulate a day of waiting for share price to bump back up
     chain.sleep(86400)

@@ -9,7 +9,7 @@ def isolation(fn_isolation):
 
 
 # set this for if we want to use tenderly or not; mostly helpful because with brownie.reverts fails in tenderly forks.
-use_tenderly = True
+use_tenderly = False
 
 
 @pytest.fixture(scope="module", autouse=use_tenderly)
@@ -169,6 +169,7 @@ def strategy(
     strategist_ms,
     whale,
     gas_oracle,
+    tests_using_tenderly,
 ):
     # make sure to include all constructor parameters needed here
     strategy = strategist.deploy(
@@ -195,7 +196,8 @@ def strategy(
     strategy.mintNFT({"from": gov})
 
     # do this for our tenderly verification
-    print("\nThis is our strategy address:", strategy.address)
+    if tests_using_tenderly:
+        print("\nThis is our strategy address:", strategy.address)
 
     yield strategy
 

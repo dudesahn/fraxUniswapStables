@@ -202,9 +202,15 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
         }
     }
 
-    // assume pessimistic value; the only place this is directly used is when liquidating the whole strategy in vault.report()
+    // assume pessimistic value; used directly in emergencyExit
     function estimatedTotalAssets() public view override returns (uint256) {
-        return balanceOfWant().add(valueOfDai()).add(balanceOfNFTpessimistic());
+        uint256 strategyTotalAssets =
+            balanceOfWant().add(valueOfDai()).add(balanceOfNFTpessimistic());
+        if (emergencyExit) {
+            uint256 debt = vault.strategies(address(this)).totalDebt;
+            strategyTotalAssets = Math.max(strategyTotalAssets, debt);
+        }
+        return strategyTotalAssets;
     }
 
     /* ========== MUTATIVE FUNCTIONS ========== */
@@ -400,21 +406,16 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
         uint256 wantBal = balanceOfWant();
 
         if (wantBal < _amountNeeded) {
+            // make sure our pool is healthy enough for a normal withdrawal
+            checkFraxPeg();
+
+            // We need to withdraw to get back more want
             uint256 toFree = _amountNeeded.sub(wantBal);
+            _withdrawSome(toFree);
 
-            // check if we have enough free DAI to cover the extra needed
-            if (valueOfDai() >= toFree) {
-                _curveSwapToFrax(balanceOfDai());
-            } else {
-                // make sure our pool is healthy enough for a normal withdrawal
-                checkFraxPeg();
-
-                // We need to withdraw to get back more want
-                _withdrawSome(_amountNeeded.sub(toFree));
-            }
+            // reload balance of want after withdrawing funds
+            wantBal = balanceOfWant();
         }
-        // reload balance of want after withdrawing funds
-        wantBal = balanceOfWant();
 
         // check again if we have enough balance available to cover the liquidation
         if (wantBal >= _amountNeeded) {
@@ -426,15 +427,18 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
         }
     }
 
+    event Liquid(uint256 _debtOutst, uint256 _freedUp);
+
     function liquidateAllPositions()
         internal
         override
         returns (uint256 _amountFreed)
     {
-        // make sure we're liquidating the maximum amount possible
-        uint256 debt = vault.strategies(address(this)).totalDebt;
-        uint256 optimisticBal = Math.max(estimatedTotalAssets(), debt);
-        (_amountFreed, ) = liquidatePosition(optimisticBal);
+        // amount here doesn't really matter, since in withdrawSome we always withdraw everything
+        // if emergencyExit is true, so just use more than we would have loose in the strategy
+        (_amountFreed, ) = liquidatePosition(estimatedTotalAssets());
+        uint256 toEmitDebt = vault.debtOutstanding();
+        emit Liquid(toEmitDebt, _amountFreed);
     }
 
     // before we go crazy withdrawing or harvesting, make sure our FRAX peg is healthy
