@@ -17,7 +17,7 @@ def test_simple_harvest(
     strategist_ms,
     amount,
     accounts,
-    dai,
+    usdc,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -39,8 +39,8 @@ def test_simple_harvest(
     print(
         "\nDust left in strategy\nFRAX:",
         strategy.balanceOfWant() / (10 ** token.decimals()),
-        "\nDAI:",
-        strategy.balanceOfDai() / 1e18,
+        "\nUSDC:",
+        strategy.balanceOfUsdc() / 1e6,
     )
 
     strategy.harvest({"from": gov})
@@ -57,8 +57,8 @@ def test_simple_harvest(
     print(
         "\nDust left in strategy\nFRAX:",
         strategy.balanceOfWant() / (10 ** token.decimals()),
-        "\nDAI:",
-        strategy.balanceOfDai() / 1e18,
+        "\nUSDC:",
+        strategy.balanceOfUsdc() / 1e6,
     )
 
     old_assets = vault.totalAssets()
@@ -90,8 +90,8 @@ def test_simple_harvest(
     print(
         "\nDust left in strategy\nFRAX:",
         strategy.balanceOfWant() / (10 ** token.decimals()),
-        "\nDAI:",
-        strategy.balanceOfDai() / 1e18,
+        "\nUSDC:",
+        strategy.balanceOfUsdc() / 1e6,
     )
 
     # Display estimated APR
@@ -125,8 +125,8 @@ def test_simple_harvest(
     print(
         "\nDust left in strategy\nFRAX:",
         strategy.balanceOfWant() / (10 ** token.decimals()),
-        "\nDAI:",
-        strategy.balanceOfDai() / 1e18,
+        "\nUSDC:",
+        strategy.balanceOfUsdc() / 1e6,
     )
 
     # simulate one day, since that's how long we lock for
@@ -153,8 +153,8 @@ def test_simple_harvest(
     print(
         "\nDust left in strategy\nFRAX:",
         strategy.balanceOfWant() / (10 ** token.decimals()),
-        "\nDAI:",
-        strategy.balanceOfDai() / 1e18,
+        "\nUSDC:",
+        strategy.balanceOfUsdc() / 1e6,
     )
 
     # simulate one day, since that's how long we lock for
@@ -190,7 +190,7 @@ def test_simple_harvest_with_uni_fees(
     strategist_ms,
     amount,
     accounts,
-    dai,
+    usdc,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -233,33 +233,31 @@ def test_simple_harvest_with_uni_fees(
     print("\nStrategy locked liquidity:", locked)
 
     # have our whale trade in the uniV3 pool a bunch to generate some fees
-    uni_values_dai = [dai.address, 500, token.address]
-    uni_values_frax = [token.address, 500, dai.address]
+    uni_values_usdc = [usdc.address, 500, token.address]
+    uni_values_frax = [token.address, 500, usdc.address]
     uni_types = ("address", "uint24", "address")
-    packed_path_dai = encode_abi_packed(uni_types, uni_values_dai)
+    packed_path_usdc = encode_abi_packed(uni_types, uni_values_usdc)
     packed_path_frax = encode_abi_packed(uni_types, uni_values_frax)
     uni_router = Contract("0xE592427A0AEce92De3Edee1F18E0157C05861564")
     token.approve(uni_router, 2**256 - 1, {"from": whale})
-    dai.approve(uni_router, 2**256 - 1, {"from": whale})
+    usdc.approve(uni_router, 2**256 - 1, {"from": whale})
     print("\nLet's do some trading!")
-    want_to_swap = (
-        token.balanceOf(whale) / 15
-    )  # whale has like $1b DAI, we don't need to do that lol
-    # note that if we do enough, we will drain all FRAX, and then won't get any more rewards from the staking pool
+    want_to_swap = token.balanceOf(whale) / 5  # whale has like $20m FRAX
+    # note that if we do enough, we will drain all USDC, and then won't get any more rewards from the staking pool
     for i in range(3):
         exact_input = (packed_path_frax, whale.address, 2**256 - 1, want_to_swap, 1)
         uni_router.exactInput(exact_input, {"from": whale})
         chain.sleep(1)
         chain.mine(1)
-        dai_to_swap = dai.balanceOf(whale)
-        exact_input_dai = (
-            packed_path_dai,
+        usdc_to_swap = usdc.balanceOf(whale)
+        exact_input_usdc = (
+            packed_path_usdc,
             whale.address,
             2**256 - 1,
-            dai_to_swap,
+            usdc_to_swap,
             1,
         )
-        uni_router.exactInput(exact_input_dai, {"from": whale})
+        uni_router.exactInput(exact_input_usdc, {"from": whale})
         print("Done with round", i)
         chain.sleep(1)
         chain.mine(1)
@@ -367,7 +365,7 @@ def test_simple_harvest_imbalanced_pool(
     strategist_ms,
     amount,
     accounts,
-    dai,
+    usdc,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -410,19 +408,17 @@ def test_simple_harvest_imbalanced_pool(
     print("\nStrategy locked liquidity:", locked)
 
     # have our whale trade in the uniV3 pool a bunch to generate some fees
-    uni_values_dai = [dai.address, 500, token.address]
-    uni_values_frax = [token.address, 500, dai.address]
+    uni_values_usdc = [usdc.address, 500, token.address]
+    uni_values_frax = [token.address, 500, usdc.address]
     uni_types = ("address", "uint24", "address")
-    packed_path_dai = encode_abi_packed(uni_types, uni_values_dai)
+    packed_path_usdc = encode_abi_packed(uni_types, uni_values_usdc)
     packed_path_frax = encode_abi_packed(uni_types, uni_values_frax)
     uni_router = Contract("0xE592427A0AEce92De3Edee1F18E0157C05861564")
     token.approve(uni_router, 2**256 - 1, {"from": whale})
-    dai.approve(uni_router, 2**256 - 1, {"from": whale})
+    usdc.approve(uni_router, 2**256 - 1, {"from": whale})
     print("\nLet's do some trading!")
-    want_to_swap = (
-        token.balanceOf(whale) / 80
-    )  # whale has like $1b DAI, we don't need to do that lol
-    # note that if we do enough, we will drain all FRAX, and then won't get any more rewards from the staking pool
+    want_to_swap = token.balanceOf(whale) / 5  # whale has like $20m FRAX
+    # note that if we do enough, we will drain all USDC, and then won't get any more rewards from the staking pool
     for i in range(3):
         exact_input = (packed_path_frax, whale.address, 2**256 - 1, want_to_swap, 1)
         uni_router.exactInput(exact_input, {"from": whale})
@@ -437,8 +433,8 @@ def test_simple_harvest_imbalanced_pool(
     print(
         "\nCurrent NFT Holdings after trading\nFRAX:",
         nft_holdings[0] / 1e18,
-        "\nDAI:",
-        nft_holdings[1] / 1e18,
+        "\nUSDC:",
+        nft_holdings[1] / 1e6,
     )
 
     # check on our NFT LP
@@ -558,7 +554,7 @@ def test_simple_harvest_imbalanced_pool_check_holdings(
     strategist_ms,
     amount,
     accounts,
-    dai,
+    usdc,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -601,19 +597,17 @@ def test_simple_harvest_imbalanced_pool_check_holdings(
     print("\nStrategy locked liquidity:", locked)
 
     # have our whale trade in the uniV3 pool a bunch to generate some fees
-    uni_values_dai = [dai.address, 500, token.address]
-    uni_values_frax = [token.address, 500, dai.address]
+    uni_values_usdc = [usdc.address, 500, token.address]
+    uni_values_frax = [token.address, 500, usdc.address]
     uni_types = ("address", "uint24", "address")
-    packed_path_dai = encode_abi_packed(uni_types, uni_values_dai)
+    packed_path_usdc = encode_abi_packed(uni_types, uni_values_usdc)
     packed_path_frax = encode_abi_packed(uni_types, uni_values_frax)
     uni_router = Contract("0xE592427A0AEce92De3Edee1F18E0157C05861564")
     token.approve(uni_router, 2**256 - 1, {"from": whale})
-    dai.approve(uni_router, 2**256 - 1, {"from": whale})
+    usdc.approve(uni_router, 2**256 - 1, {"from": whale})
     print("\nLet's do some trading!")
-    want_to_swap = (
-        token.balanceOf(whale) / 80
-    )  # whale has like $200m FRAX, we don't need to do that lol
-    # note that if we do enough, we will drain all DAI, and then won't get any more rewards from the staking pool
+    want_to_swap = token.balanceOf(whale) / 5  # whale has like $20m FRAX
+    # note that if we do enough, we will drain all USDC, and then won't get any more rewards from the staking pool
     for i in range(3):
         exact_input = (packed_path_frax, whale.address, 2**256 - 1, want_to_swap, 1)
         uni_router.exactInput(exact_input, {"from": whale})
@@ -628,8 +622,8 @@ def test_simple_harvest_imbalanced_pool_check_holdings(
     print(
         "\nCurrent NFT Holdings after trading\nFRAX:",
         nft_holdings[0] / 1e18,
-        "\nDAI:",
-        nft_holdings[1] / 1e18,
+        "\nUSDC:",
+        nft_holdings[1] / 1e6,
     )
 
     # check on our NFT LP

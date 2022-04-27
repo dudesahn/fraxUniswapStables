@@ -12,7 +12,6 @@ def test_emergency_exit(
     strategy,
     chain,
     amount,
-    dai,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)

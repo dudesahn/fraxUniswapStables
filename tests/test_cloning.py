@@ -13,7 +13,7 @@ def test_cloning(
     keeper,
     rewards,
     chain,
-    StrategyFraxUniswapFRAXDAI,
+    StrategyFraxUniswapFRAXUSDC,
     guardian,
     amount,
     tests_using_tenderly,
@@ -28,7 +28,7 @@ def test_cloning(
             keeper,
             {"from": gov},
         )
-        newStrategy = StrategyFraxUniswapFRAXDAI.at(tx.return_value)
+        newStrategy = StrategyFraxUniswapFRAXUSDC.at(tx.return_value)
     else:
         # Shouldn't be able to call initialize again
         with brownie.reverts():
@@ -48,7 +48,7 @@ def test_cloning(
             keeper,
             {"from": gov},
         )
-        newStrategy = StrategyFraxUniswapFRAXDAI.at(tx.return_value)
+        newStrategy = StrategyFraxUniswapFRAXUSDC.at(tx.return_value)
 
         # Shouldn't be able to call initialize again
         with brownie.reverts():
@@ -78,7 +78,7 @@ def test_cloning(
     vault.addStrategy(newStrategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
 
     # setup our NFT on our new strategy, IMPORTANT***
-    token.transfer(newStrategy, 100e6, {"from": whale})
+    token.transfer(newStrategy, 100 * (10 ** token.decimals()), {"from": whale})
     newStrategy.mintNFT({"from": gov})
 
     assert vault.withdrawalQueue(1) == newStrategy

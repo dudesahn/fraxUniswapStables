@@ -37,7 +37,7 @@ interface IBaseFee {
     function isCurrentBaseFeeAcceptable() external view returns (bool);
 }
 
-contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
+contract StrategyFraxUniswapFRAXUSDC is BaseStrategy {
     using Address for address;
     using SafeMath for uint128;
 
@@ -54,13 +54,13 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
     // these are variables specific to our want-FRAX pair
     uint256 public nftId;
     address internal constant fraxLock =
-        0xF22471AC2156B489CC4a59092c56713F813ff53e;
+        0x3EF26504dbc8Dd7B7aa3E97Bc9f3813a9FC0B4B0;
     address internal constant uniV3Pool =
-        0x97e7d56A0408570bA1a7852De36350f7713906ec;
+        0xc63B0708E2F7e69CB8A1df0e1389A98C35A76D52;
 
     // tokens
-    IERC20 internal constant dai =
-        IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
+    IERC20 internal constant usdc =
+        IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
     IERC20 internal constant fxs =
         IERC20(0x3432B6A60D23Ca0dFCa7761B7ab56459D9C964D0);
 
@@ -105,9 +105,9 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
         slippageMax = 50;
 
         want.approve(address(curve), type(uint256).max);
-        dai.approve(address(curve), type(uint256).max);
+        usdc.approve(address(curve), type(uint256).max);
         want.approve(uniNFT, type(uint256).max);
-        dai.approve(uniNFT, type(uint256).max);
+        usdc.approve(uniNFT, type(uint256).max);
         fxs.approve(unirouter, type(uint256).max);
     }
 
@@ -147,7 +147,7 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
             newStrategy := create(0, clone_code, 0x37)
         }
 
-        StrategyFraxUniswapFRAXDAI(newStrategy).initialize(
+        StrategyFraxUniswapFRAXUSDC(newStrategy).initialize(
             _vault,
             _strategist,
             _rewards,
@@ -160,7 +160,7 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
     /* ========== VIEWS ========== */
 
     function name() external view override returns (string memory) {
-        return "StrategyFraxUniswapFRAXDAI";
+        return "StrategyFraxUniswapFRAXUSDC";
     }
 
     // returns balance of want token
@@ -168,34 +168,35 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
         return want.balanceOf(address(this));
     }
 
-    // returns balance of dai
-    function balanceOfDai() public view returns (uint256) {
-        return dai.balanceOf(address(this));
+    // returns balance of usdc
+    function balanceOfUsdc() public view returns (uint256) {
+        return usdc.balanceOf(address(this));
     }
 
-    /// @notice Returns additional FRAX we get if we swap our DAI on Curve
-    function valueOfDai() public view returns (uint256) {
-        // see how much FRAX we would get for our DAI on curve
-        uint256 currentDai = balanceOfDai();
-        if (currentDai > 0) {
-            return curve.get_dy_underlying(1, 0, currentDai);
+    /// @notice Returns additional FRAX we get if we swap our USDC on Curve
+    function valueOfUsdc() public view returns (uint256) {
+        // see how much FRAX we would get for our USDC on curve
+        uint256 currentUsdc = balanceOfUsdc();
+        if (currentUsdc > 0) {
+            return curve.get_dy_underlying(2, 0, currentUsdc);
         } else {
             return 0;
         }
     }
 
-    // returns balance of our UniV3 LP, assuming 1 DAI = 1 want, factoring curve swap fee
+    // returns balance of our UniV3 LP, assuming 1 USDC = 1 want, factoring curve swap fee
     function balanceOfNFToptimistic() public view returns (uint256) {
-        (uint256 daiBalance, uint256 fraxBalance) = principal();
-        return daiBalance.add(fraxBalance).mul(9996).div(DENOMINATOR);
+        (uint256 fraxBalance, uint256 usdcBalance) = principal();
+        uint256 usdcRebase = usdcBalance.mul(1e12).mul(9996).div(DENOMINATOR); // mul by 1e12 to convert usdc to frax, assume 1:1 swap on curve with fees
+        return usdcRebase.add(fraxBalance);
     }
 
-    /// @notice Returns balance of our UniV3 LP, swapping all DAI to want (FRAX) using Curve.
+    /// @notice Returns balance of our UniV3 LP, swapping all USDC to want (FRAX) using Curve.
     function balanceOfNFTpessimistic() public view returns (uint256) {
-        (uint256 daiBalance, uint256 fraxBalance) = principal();
-        // only bother adding/converting if we have anything, otherwise just return daiBalance
-        if (daiBalance > 0) {
-            uint256 fraxCurveOut = curve.get_dy_underlying(1, 0, daiBalance);
+        (uint256 fraxBalance, uint256 usdcBalance) = principal();
+        // only bother adding/converting if we have anything, otherwise just return fraxBalance
+        if (usdcBalance > 0) {
+            uint256 fraxCurveOut = curve.get_dy_underlying(2, 0, usdcBalance);
             return fraxCurveOut.add(fraxBalance);
         } else {
             return fraxBalance;
@@ -204,7 +205,8 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
 
     // assume pessimistic value; used directly in emergencyExit
     function estimatedTotalAssets() public view override returns (uint256) {
-        return balanceOfWant().add(valueOfDai()).add(balanceOfNFTpessimistic());
+        return
+            balanceOfWant().add(valueOfUsdc()).add(balanceOfNFTpessimistic());
     }
 
     /* ========== MUTATIVE FUNCTIONS ========== */
@@ -221,9 +223,9 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
     {
         // in normal situations we can simply use our loose tokens as profit
         // do this so we don't count dust leftover from LPing as profit
-        uint256 beforeStableBalance = balanceOfWant().add(valueOfDai());
+        uint256 beforeStableBalance = balanceOfWant().add(valueOfUsdc());
 
-        // claim our rewards. this will give us FXS (emissions), FRAX and DAI (fees)
+        // claim our rewards. this will give us FXS (emissions), FRAX and USDC (fees)
         // however, only claim if we have an NFT staked
         if (IFrax(fraxLock).lockedLiquidityOf(address(this)) > 0) {
             IFrax(fraxLock).getReward();
@@ -242,17 +244,17 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
             }
         }
 
-        // convert all of our DAI profits to FRAX for ease of accounting
-        uint256 daiToSwap = balanceOfDai();
-        if (daiToSwap > 0) {
-            _curveSwapToFrax(daiToSwap);
+        // convert all of our USDC profits to FRAX for ease of accounting
+        uint256 usdcToSwap = balanceOfUsdc();
+        if (usdcToSwap > 0) {
+            _curveSwapToFrax(usdcToSwap);
         }
 
         // check how much we have after claiming our rewards
         uint256 wantBal = balanceOfWant();
 
-        // slightly pessimistic profits since we convert our FRAX to DAI before counting it
-        uint256 afterStableBalance = valueOfDai().add(wantBal);
+        // slightly pessimistic profits since we convert our FRAX to USDC before counting it
+        uint256 afterStableBalance = valueOfUsdc().add(wantBal);
         _profit = afterStableBalance.sub(beforeStableBalance);
         _debtPayment = _debtOutstanding;
 
@@ -276,10 +278,9 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
             checkFraxPeg();
         }
 
-        // we need to free up all of our profit as DAI
+        // we need to free up all of our profit as FRAX
         uint256 toFree = _debtPayment.add(_profit);
 
-        // this will pretty much always be true unless we stop getting FRAX profits
         if (toFree > wantBal) {
             toFree = toFree.sub(wantBal);
 
@@ -317,22 +318,26 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
         );
     }
 
-    function _curveSwapToDai(uint256 _amountIn) internal {
-        // use our slippage tolerance, FRAX and DAI have same decimals
+    function _curveSwapToUsdc(uint256 _amountIn) internal {
+        // use our slippage tolerance, convert between FRAX (1e18) -> USDC (1e6)
         uint256 _amountOut =
-            _amountIn.mul(DENOMINATOR.sub(slippageMax)).div(DENOMINATOR);
+            _amountIn.mul(DENOMINATOR.sub(slippageMax)).div(DENOMINATOR).div(
+                1e12
+            );
 
         // USDC is 2, DAI is 1, Tether is 3, frax is 0
-        curve.exchange_underlying(0, 1, _amountIn, _amountOut);
+        curve.exchange_underlying(0, 2, _amountIn, _amountOut);
     }
 
     function _curveSwapToFrax(uint256 _amountIn) internal {
-        // use our slippage tolerance, FRAX and DAI have same decimals
+        // use our slippage tolerance, convert between USDC (1e6) -> FRAX (1e18)
         uint256 _amountOut =
-            _amountIn.mul(DENOMINATOR.sub(slippageMax)).div(DENOMINATOR);
+            _amountIn.mul(DENOMINATOR.sub(slippageMax)).div(DENOMINATOR).mul(
+                1e12
+            );
 
         // USDC is 2, DAI is 1, Tether is 3, frax is 0
-        curve.exchange_underlying(1, 0, _amountIn, _amountOut);
+        curve.exchange_underlying(2, 0, _amountIn, _amountOut);
     }
 
     // Deposit value to NFT & stake NFT
@@ -352,27 +357,29 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
             // Invest the rest of the want
             uint256 wantBal = balanceOfWant();
             if (wantBal > 0) {
-                // need to swap half want to frax, but use the proper conversion
+                // need to swap half want to usdc, but use the proper conversion
                 // based on the current exchange rate in the LP
-                (uint256 daiBal, uint256 fraxBal) = principal();
-                uint256 daiPercentage = 5e17; // default our percentage to 50%, 100% is 1e18
-                if (daiBal > 0 || fraxBal > 0) {
-                    daiPercentage = daiBal.mul(1e18).div(fraxBal.add(daiBal));
+                (uint256 fraxBal, uint256 usdcBal) = principal();
+                uint256 usdcPercentage = 5e17; // default our percentage to 50%, 100% is 1e18
+                if (usdcBal > 0 || fraxBal > 0) {
+                    usdcPercentage = (usdcBal.mul(1e12).mul(1e18)).div(
+                        fraxBal.add(usdcBal.mul(1e12))
+                    ); // multiply usdc by 1e12 to convert to frax, 1e18
                 }
-                uint256 daiNeeded = wantBal.mul(daiPercentage).div(1e18); // this will be 1e18, which matches our valueOfDai
+                uint256 usdcNeeded = wantBal.mul(usdcPercentage).div(1e18); // this will be 1e18, which matches our valueOfUsdc
 
                 // we should only have FRAX holdings after our harvest
                 // doing this will leave us with a little FRAX leftover each time
-                if (daiNeeded > 0) {
-                    _curveSwapToDai(daiNeeded);
+                if (usdcNeeded > 0) {
+                    _curveSwapToUsdc(usdcNeeded);
                 }
 
                 // add more liquidity to our NFT
                 IUniNFT.increaseStruct memory setIncrease =
                     IUniNFT.increaseStruct(
                         nftId,
-                        balanceOfDai(),
                         balanceOfWant(),
+                        balanceOfUsdc(),
                         0,
                         0,
                         block.timestamp
@@ -447,7 +454,7 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
                     (virtualBalance.sub(realBalance)).mul(DENOMINATOR).div(
                         realBalance
                     )),
-                "too much FRAX"
+                "too much USDC"
             );
         } else {
             require(
@@ -455,7 +462,7 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
                     (realBalance.sub(virtualBalance)).mul(DENOMINATOR).div(
                         virtualBalance
                     )),
-                "too much DAI"
+                "too much FRAX"
             );
         }
     }
@@ -522,16 +529,16 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
 
         IUniNFT(uniNFT).collect(collectParams);
 
-        // swap any DAI we have to FRAX
-        uint256 currentDai = balanceOfDai();
-        if (currentDai > 0) {
-            _curveSwapToFrax(currentDai);
+        // swap any USDC we have to FRAX
+        uint256 currentUsdc = balanceOfUsdc();
+        if (currentUsdc > 0) {
+            _curveSwapToFrax(currentUsdc);
         }
     }
 
     // transfers all tokens to new strategy
     function prepareMigration(address _newStrategy) internal override {
-        dai.transfer(_newStrategy, balanceOfDai());
+        usdc.transfer(_newStrategy, balanceOfUsdc());
         fxs.transfer(_newStrategy, fxs.balanceOf(address(this)));
 
         // NFT has to be unlocked before we can do anything with it
@@ -618,20 +625,20 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
             "can't mint"
         );
 
-        // swap some to dai, don't care about using real pricing since it's a small amount
+        // swap some to usdc, don't care about using real pricing since it's a small amount
         // and is only meant to seed the LP. prefer extra want left over for accounting reasons.
         uint256 swapAmt = balanceOfWant().mul(40).div(100);
-        _curveSwapToDai(swapAmt);
+        _curveSwapToUsdc(swapAmt);
 
         IUniNFT.nftStruct memory setNFT =
             IUniNFT.nftStruct(
-                address(dai),
                 address(want),
+                address(usdc),
                 500,
-                (-50),
-                (50),
-                balanceOfDai(),
+                (-276380),
+                (-276270),
                 balanceOfWant(),
+                balanceOfUsdc(),
                 0,
                 0,
                 address(this),
@@ -656,8 +663,8 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
             //contraqct uniNFT,
             //nftId,
             // uint160 sqrtRatioX96
-            uint256 daiHoldings,
-            uint256 fraxHoldings
+            uint256 fraxHoldings,
+            uint256 usdcHoldings
         )
     {
         if (nftId == 1) {

@@ -13,7 +13,7 @@ def test_odds_and_ends(
     strategy,
     chain,
     strategist_ms,
-    StrategyFraxUniswapFRAXDAI,
+    StrategyFraxUniswapFRAXUSDC,
     amount,
     healthCheck,
 ):
@@ -72,7 +72,7 @@ def test_odds_and_ends(
     # we can try migrating too!
     # deploy our new strategy
     new_strategy = strategist.deploy(
-        StrategyFraxUniswapFRAXDAI,
+        StrategyFraxUniswapFRAXUSDC,
         vault,
     )
     total_old = strategy.estimatedTotalAssets()
@@ -111,7 +111,7 @@ def test_odds_and_ends(
     )
 
     # since we sent away our NFT, we need to mint another one
-    token.transfer(new_strategy, 100e6, {"from": whale})
+    token.transfer(new_strategy, 100 * (10 ** token.decimals()), {"from": whale})
     new_strategy.mintNFT({"from": gov})
     chain.mine(1)
     chain.sleep(1)
