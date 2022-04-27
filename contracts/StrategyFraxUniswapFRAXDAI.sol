@@ -279,7 +279,6 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
         // we need to free up all of our profit as DAI
         uint256 toFree = _debtPayment.add(_profit);
 
-        // this will pretty much always be true unless we stop getting FRAX profits
         if (toFree > wantBal) {
             toFree = toFree.sub(wantBal);
 
@@ -447,7 +446,7 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
                     (virtualBalance.sub(realBalance)).mul(DENOMINATOR).div(
                         realBalance
                     )),
-                "too much FRAX"
+                "too much DAI"
             );
         } else {
             require(
@@ -455,7 +454,7 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
                     (realBalance.sub(virtualBalance)).mul(DENOMINATOR).div(
                         virtualBalance
                     )),
-                "too much DAI"
+                "too much FRAX"
             );
         }
     }
