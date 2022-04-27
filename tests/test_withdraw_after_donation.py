@@ -477,13 +477,15 @@ def test_withdraw_after_donation_7(
     harvest = strategy.harvest({"from": gov})
     new_params = vault.strategies(strategy).dict()
 
-    # check everywhere to make sure we emptied out the strategy, sometimes need a second harvest
+    # check to make sure we emptied out the strategy, sometimes need a second harvest
+    # for emergency exit, we sometimes free up more than expected, and thus
+    # have extra FRAX (want) remaining in the strategy as loose FRAX
     if strategy.estimatedTotalAssets() > 0:
         strategy.setDoHealthCheck(False, {"from": gov})
         chain.sleep(1)
         harvest = strategy.harvest({"from": gov})
         new_params = vault.strategies(strategy).dict()
-        assert strategy.estimatedTotalAssets() == 0
+    assert strategy.estimatedTotalAssets() == 0
     assert token.balanceOf(strategy) == 0
     current_assets = vault.totalAssets()
 
@@ -556,12 +558,14 @@ def test_withdraw_after_donation_8(
     harvest = strategy.harvest({"from": gov})
     new_params = vault.strategies(strategy).dict()
 
-    # check everywhere to make sure we emptied out the strategy, sometimes need a second harvest
-#     if strategy.estimatedTotalAssets() > 0:
-#         strategy.setDoHealthCheck(False, {"from": gov})
-#         chain.sleep(1)
-#         harvest = strategy.harvest({"from": gov})
-#         new_params = vault.strategies(strategy).dict()
+    # check to make sure we emptied out the strategy, sometimes need a second harvest
+    # for emergency exit, we sometimes free up more than expected, and thus
+    # have extra FRAX (want) remaining in the strategy as loose FRAX
+    if strategy.estimatedTotalAssets() > 0:
+        strategy.setDoHealthCheck(False, {"from": gov})
+        chain.sleep(1)
+        harvest = strategy.harvest({"from": gov})
+        new_params = vault.strategies(strategy).dict()
     assert strategy.estimatedTotalAssets() == 0
     assert token.balanceOf(strategy) == 0
     current_assets = vault.totalAssets()
