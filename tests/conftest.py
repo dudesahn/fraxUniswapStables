@@ -34,8 +34,8 @@ def tests_using_tenderly():
 @pytest.fixture(scope="module")
 def whale(accounts):
     # Totally in it for the tech
-    # Update this with a large holder of your want token (the largest EOA holder of FRAX, fantom bridge)
-    whale = accounts.at("0xC564EE9f21Ed8A2d8E7e76c085740d5e4c5FaFbE", force=True)
+    # Update this with a large holder of your want token (the largest EOA holder of FRAX)
+    whale = accounts.at("0x820A9eb227BF770A9dd28829380d53B76eAf1209", force=True)
     yield whale
 
 
