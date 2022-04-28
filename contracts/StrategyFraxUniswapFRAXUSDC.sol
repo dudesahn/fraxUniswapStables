@@ -253,7 +253,7 @@ contract StrategyFraxUniswapFRAXUSDC is BaseStrategy {
         // check how much we have after claiming our rewards
         uint256 wantBal = balanceOfWant();
 
-        // slightly pessimistic profits since we convert our FRAX to USDC before counting it
+        // slightly pessimistic profits since we convert our USDC to FRAX before counting it
         uint256 afterStableBalance = valueOfUsdc().add(wantBal);
         _profit = afterStableBalance.sub(beforeStableBalance);
         _debtPayment = _debtOutstanding;
@@ -387,13 +387,8 @@ contract StrategyFraxUniswapFRAXUSDC is BaseStrategy {
                 IUniNFT(uniNFT).increaseLiquidity(setIncrease);
             }
 
-            // re-lock our NFT for more rewards
-            uint256 lockTime = fraxTimelockSet;
-            IERC721(uniNFT).approve(fraxLock, nftId);
-            IFrax(fraxLock).stakeLocked(nftId, lockTime);
-
-            // update our new unlock time
-            nftUnlockTime = block.timestamp.add(lockTime);
+            // re-lock our NFT
+            _nftStake();
         }
     }
 
@@ -544,10 +539,9 @@ contract StrategyFraxUniswapFRAXUSDC is BaseStrategy {
         // NFT has to be unlocked before we can do anything with it
         require(block.timestamp > nftUnlockTime, "Wait for NFT to unlock!");
 
-        // unstake and send our NFT to our new strategy
-        _nftUnstake();
+        // unstake and send our NFT to our new strategy, don't try migrating if we don't have an NFT
         if (nftId != 1) {
-            // don't try migrating if we don't have an NFT
+            _nftUnstake();
             IERC721(uniNFT).transferFrom(address(this), _newStrategy, nftId);
             // approvals automatically revoke when we migrate. and set our NFTid back to 1
             _setGovParams(address(0), address(0), 0, 1, 0, 0);
@@ -723,6 +717,18 @@ contract StrategyFraxUniswapFRAXUSDC is BaseStrategy {
 
     function nftUnstake() external onlyVaultManagers {
         _nftUnstake();
+    }
+
+    function _nftStake() internal {
+        IERC721(uniNFT).approve(fraxLock, nftId);
+        IFrax(fraxLock).stakeLocked(nftId, fraxTimelockSet);
+
+        // update our new unlock time
+        nftUnlockTime = block.timestamp.add(fraxTimelockSet);
+    }
+
+    function nftStake() external onlyVaultManagers {
+        _nftStake();
     }
 
     /// @notice Include this so gov can sweep our NFT if needed.
