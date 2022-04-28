@@ -49,7 +49,7 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
     uint256 public fraxTimelockSet;
     address public refer;
     address public voter;
-    uint256 public nftUnlockTime = type(uint256).max; // timestamp that we can withdraw our staked NFT. init at max so we must mint first.
+    uint256 public nftUnlockTime; // timestamp that we can withdraw our staked NFT. init at max so we must mint first.
 
     // these are variables specific to our want-FRAX pair
     uint256 public nftId;
@@ -80,8 +80,6 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
     uint256 public slippageMax; // in bips, how much slippage we allow between our optimistic assets and pessimistic. 50 = 0.5% slippage. Remember curve swap costs 0.04%.
     bool internal forceHarvestTriggerOnce; // only set this to true externally when we want to trigger our keepers to harvest for us
 
-    // do we need to add a maxInvest parameter here?
-
     // check for cloning
     bool internal isOriginal = true;
 
@@ -99,12 +97,13 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
     function _initializeStrat() internal {
         require(nftId == 0);
 
-        refer = 0x93A62dA5a14C80f265DAbC077fCEE437B1a0Efde;
-        voter = 0x93A62dA5a14C80f265DAbC077fCEE437B1a0Efde;
+        refer = 0x16388463d60FFE0661Cf7F1f31a7D658aC790ff7;
+        voter = 0x16388463d60FFE0661Cf7F1f31a7D658aC790ff7;
         fraxTimelockSet = 86400;
         nftId = 1;
         reLockProfits = true;
         slippageMax = 50;
+        nftUnlockTime = type(uint256).max;
 
         want.approve(address(curve), type(uint256).max);
         frax.approve(address(curve), type(uint256).max);
@@ -205,7 +204,7 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         }
     }
 
-    // assume pessimistic value; the only place this is directly used is when liquidating the whole strategy in vault.report()
+    // assume pessimistic value; used directly in emergencyExit
     function estimatedTotalAssets() public view override returns (uint256) {
         return
             balanceOfWant().add(valueOfFrax()).add(balanceOfNFTpessimistic());
@@ -283,7 +282,6 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         // we need to free up all of our profit as USDC
         uint256 toFree = _debtPayment.add(_profit);
 
-        // this will pretty much always be true unless we stop getting FRAX profits
         if (toFree > wantBal) {
             toFree = toFree.sub(wantBal);
 
@@ -390,13 +388,8 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
                 IUniNFT(uniNFT).increaseLiquidity(setIncrease);
             }
 
-            // re-lock our NFT for more rewards
-            uint256 lockTime = fraxTimelockSet;
-            IERC721(uniNFT).approve(fraxLock, nftId);
-            IFrax(fraxLock).stakeLocked(nftId, lockTime);
-
-            // update our new unlock time
-            nftUnlockTime = block.timestamp.add(lockTime);
+            // re-lock our NFT
+            _nftStake();
         }
     }
 
@@ -420,6 +413,7 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
             // reload balance of want after withdrawing funds
             wantBal = balanceOfWant();
         }
+
         // check again if we have enough balance available to cover the liquidation
         if (wantBal >= _amountNeeded) {
             _liquidatedAmount = _amountNeeded;
@@ -546,10 +540,9 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
         // NFT has to be unlocked before we can do anything with it
         require(block.timestamp > nftUnlockTime, "Wait for NFT to unlock!");
 
-        // unstake and send our NFT to our new strategy
-        _nftUnstake();
+        // unstake and send our NFT to our new strategy, don't try migrating if we don't have an NFT
         if (nftId != 1) {
-            // don't try migrating if we don't have an NFT
+            _nftUnstake();
             IERC721(uniNFT).transferFrom(address(this), _newStrategy, nftId);
             // approvals automatically revoke when we migrate. and set our NFTid back to 1
             _setGovParams(address(0), address(0), 0, 1, 0, 0);
@@ -725,6 +718,18 @@ contract StrategyFraxUniswapUSDC is BaseStrategy {
 
     function nftUnstake() external onlyVaultManagers {
         _nftUnstake();
+    }
+
+    function _nftStake() internal {
+        IERC721(uniNFT).approve(fraxLock, nftId);
+        IFrax(fraxLock).stakeLocked(nftId, fraxTimelockSet);
+
+        // update our new unlock time
+        nftUnlockTime = block.timestamp.add(fraxTimelockSet);
+    }
+
+    function nftStake() external onlyVaultManagers {
+        _nftStake();
     }
 
     /// @notice Include this so gov can sweep our NFT if needed.
