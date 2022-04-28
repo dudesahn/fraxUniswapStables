@@ -49,7 +49,7 @@ contract StrategyFraxUniswapFRAXUSDC is BaseStrategy {
     uint256 public fraxTimelockSet;
     address public refer;
     address public voter;
-    uint256 public nftUnlockTime = type(uint256).max; // timestamp that we can withdraw our staked NFT. init at max so we must mint first.
+    uint256 public nftUnlockTime; // timestamp that we can withdraw our staked NFT. init at max so we must mint first.
 
     // these are variables specific to our want-FRAX pair
     uint256 public nftId;
@@ -103,6 +103,7 @@ contract StrategyFraxUniswapFRAXUSDC is BaseStrategy {
         nftId = 1;
         reLockProfits = true;
         slippageMax = 50;
+        nftUnlockTime = type(uint256).max;
 
         want.approve(address(curve), type(uint256).max);
         usdc.approve(address(curve), type(uint256).max);
