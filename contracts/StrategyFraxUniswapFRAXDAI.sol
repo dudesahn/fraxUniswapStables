@@ -252,7 +252,7 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
         // check how much we have after claiming our rewards
         uint256 wantBal = balanceOfWant();
 
-        // slightly pessimistic profits since we convert our FRAX to DAI before counting it
+        // slightly pessimistic profits since we convert our DAI to FRAX before counting it
         uint256 afterStableBalance = valueOfDai().add(wantBal);
         _profit = afterStableBalance.sub(beforeStableBalance);
         _debtPayment = _debtOutstanding;
@@ -277,7 +277,7 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
             checkFraxPeg();
         }
 
-        // we need to free up all of our profit as DAI
+        // we need to free up all of our profit as FRAX
         uint256 toFree = _debtPayment.add(_profit);
 
         if (toFree > wantBal) {
