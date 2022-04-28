@@ -49,7 +49,7 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
     uint256 public fraxTimelockSet;
     address public refer;
     address public voter;
-    uint256 public nftUnlockTime = type(uint256).max; // timestamp that we can withdraw our staked NFT. init at max so we must mint first.
+    uint256 public nftUnlockTime; // timestamp that we can withdraw our staked NFT. init at max so we must mint first.
 
     // these are variables specific to our want-FRAX pair
     uint256 public nftId;
@@ -103,6 +103,7 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
         nftId = 1;
         reLockProfits = true;
         slippageMax = 50;
+        nftUnlockTime = type(uint256).max;
 
         want.approve(address(curve), type(uint256).max);
         dai.approve(address(curve), type(uint256).max);
@@ -379,13 +380,8 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
                 IUniNFT(uniNFT).increaseLiquidity(setIncrease);
             }
 
-            // re-lock our NFT for more rewards
-            uint256 lockTime = fraxTimelockSet;
-            IERC721(uniNFT).approve(fraxLock, nftId);
-            IFrax(fraxLock).stakeLocked(nftId, lockTime);
-
-            // update our new unlock time
-            nftUnlockTime = block.timestamp.add(lockTime);
+            // re-lock our NFT
+            _nftStake();
         }
     }
 
@@ -536,10 +532,9 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
         // NFT has to be unlocked before we can do anything with it
         require(block.timestamp > nftUnlockTime, "Wait for NFT to unlock!");
 
-        // unstake and send our NFT to our new strategy
-        _nftUnstake();
+        // unstake and send our NFT to our new strategy, but don't try migrating if we don't have an NFT
         if (nftId != 1) {
-            // don't try migrating if we don't have an NFT
+            _nftUnstake();
             IERC721(uniNFT).transferFrom(address(this), _newStrategy, nftId);
             // approvals automatically revoke when we migrate. and set our NFTid back to 1
             _setGovParams(address(0), address(0), 0, 1, 0, 0);
@@ -715,6 +710,18 @@ contract StrategyFraxUniswapFRAXDAI is BaseStrategy {
 
     function nftUnstake() external onlyVaultManagers {
         _nftUnstake();
+    }
+
+    function _nftStake() internal {
+        IERC721(uniNFT).approve(fraxLock, nftId);
+        IFrax(fraxLock).stakeLocked(nftId, fraxTimelockSet);
+
+        // update our new unlock time
+        nftUnlockTime = block.timestamp.add(fraxTimelockSet);
+    }
+
+    function nftStake() external onlyVaultManagers {
+        _nftStake();
     }
 
     /// @notice Include this so gov can sweep our NFT if needed.
