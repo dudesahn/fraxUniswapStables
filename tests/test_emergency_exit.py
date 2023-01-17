@@ -185,3 +185,60 @@ def test_emergency_exit_with_no_gain_or_loss(
     # withdraw and confirm we made money, accounting for all of the funds we lost lol
     vault.withdraw({"from": whale})
     assert token.balanceOf(whale) + amount + whale_to_give >= startingWhale
+
+
+def test_emergency_exit_withdraw_before_harvest(
+    gov,
+    token,
+    vault,
+    whale,
+    strategy,
+    chain,
+    amount,
+):
+    ## deposit to the vault after approving
+    startingWhale = token.balanceOf(whale)
+    token.approve(vault, 2**256 - 1, {"from": whale})
+    vault.deposit(amount, {"from": whale})
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
+    chain.sleep(1)
+
+    # simulate 1 day of earnings
+    chain.sleep(86400)
+    chain.mine(1)
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
+    chain.sleep(1)
+
+    # set emergency and exit, then confirm that the strategy has no funds
+    chain.sleep(86400)
+    strategy.setEmergencyExit({"from": gov})
+    
+    # whale withdraws 25% of funds
+    to_withdraw = amount / 4
+    vault.withdraw(to_withdraw, {"from": whale})
+
+    # turn off healthcheck, we will have a loss on this harvest due to slippage
+    strategy.setDoHealthCheck(False, {"from": gov})
+    chain.sleep(1)
+    tx = strategy.harvest({"from": gov})
+    print("This is our harvest detail:", tx.events["Harvested"])
+    harvest_loss = tx.events["Harvested"]["loss"]
+    print("This was our harvest loss:", harvest_loss / (10 ** token.decimals()))
+    chain.sleep(1)
+    assert strategy.estimatedTotalAssets() == 0
+
+    # simulate a day of waiting for share price to bump back up
+    chain.sleep(86400)
+    chain.mine(1)
+
+    # withdraw and check on our losses (due to slippage on big swaps in/out)
+    # this loss should have already been realized on harvest, though, and we removed all funds from strategy so no more slippage.
+    tx = vault.withdraw({"from": whale})
+    loss = startingWhale - token.balanceOf(whale)
+    print("Losses from withdrawal slippage:", loss / (10 ** token.decimals()))
+
+    # since we harvested on this loss (wasn't just a withdrawal) then we will see a decrease in share price
+    assert vault.pricePerShare() < 10 ** token.decimals()
+    print("Vault share price", vault.pricePerShare() / (10 ** token.decimals()))
